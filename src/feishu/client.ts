@@ -9,6 +9,7 @@ import { decodeMessageReceipt, outgoingPayload } from './messages.js';
 export abstract class FeishuRequestError extends Error {
   readonly status: number;
   readonly feishuCode?: number;
+  abstract readonly disposition: 'permanent' | 'transient';
 
   protected constructor(name: string, message: string, status: number, feishuCode?: number) {
     super(message);
@@ -19,12 +20,14 @@ export abstract class FeishuRequestError extends Error {
 }
 
 export class FeishuPermanentError extends FeishuRequestError {
+  readonly disposition = 'permanent' as const;
   constructor(status: number, feishuCode?: number) {
     super('FeishuPermanentError', `Feishu rejected the request with HTTP ${status}`, status, feishuCode);
   }
 }
 
 export class FeishuRateLimitedError extends FeishuRequestError {
+  readonly disposition = 'transient' as const;
   readonly retryAfterMs?: number;
 
   constructor(status: number, feishuCode?: number, retryAfterMs?: number) {
@@ -34,12 +37,14 @@ export class FeishuRateLimitedError extends FeishuRequestError {
 }
 
 export class FeishuTransientError extends FeishuRequestError {
+  readonly disposition = 'transient' as const;
   constructor(status: number, feishuCode?: number) {
     super('FeishuTransientError', `Feishu is temporarily unavailable with HTTP ${status}`, status, feishuCode);
   }
 }
 
 export class FeishuUnavailableError extends Error {
+  readonly disposition = 'transient' as const;
   constructor() {
     super('Feishu request failed before receiving an HTTP response');
     this.name = 'FeishuUnavailableError';
@@ -47,6 +52,7 @@ export class FeishuUnavailableError extends Error {
 }
 
 export class FeishuContractError extends Error {
+  readonly disposition = 'permanent' as const;
   constructor(reason: string) {
     super(`Feishu returned a malformed successful response: ${reason}`);
     this.name = 'FeishuContractError';
