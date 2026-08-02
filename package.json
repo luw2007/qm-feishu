@@ -1,0 +1,46 @@
+{
+  "name": "@luw2007/qm-feishu",
+  "version": "0.1.0",
+  "description": "Independent Feishu/Lark message surface for QM",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=24"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "node --import tsx --test 'test/**/*.test.ts'",
+    "test:coverage": "node --import tsx --experimental-test-coverage --test 'test/**/*.test.ts'",
+    "test:qm-contract": "node --import tsx --test test/qm/contract.integration.test.ts",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "1.72.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.1.2",
+    "eslint": "10.8.0",
+    "tsx": "4.23.4",
+    "typescript": "6.0.2",
+    "typescript-eslint": "8.65.0"
+  },
+  "qmCompatibility": {
+    "repository": "yc-software/qm",
+    "revision": "7f2c916"
+  }
+}
