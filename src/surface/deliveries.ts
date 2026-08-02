@@ -1,8 +1,13 @@
 import { createHash } from 'node:crypto';
 
 import type { FeishuPort, QmPort } from '../ports.js';
-import type { Delivery, DeliveryReceipt, FeishuTarget, MessageReceipt } from '../types.js';
+import type { Delivery, DeliveryAttachment, DeliveryReceipt, FeishuTarget, MessageReceipt, OutgoingMessage } from '../types.js';
 import { KeyedQueue } from './keyed-queue.js';
+
+// Mirrors Feishu's documented image/file upload ceilings; outgoing artifacts are
+// buffered once up to this bound before upload so memory use stays predictable.
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_FILE_BYTES = 30 * 1024 * 1024;
 
 const CHAT_TARGET = /^chat:([^:]+):message:([^:]+)$/;
 const USER_TARGET = /^user:([^:]+)$/;
@@ -40,6 +45,44 @@ export function derivePartUuid(idempotencyKey: string, partIndex: number, partKi
     .update(`${idempotencyKey}\0${String(partIndex)}\0${partKind}`)
     .digest('hex')
     .slice(0, 50);
+}
+
+type BoundedRead =
+  | { kind: 'ok'; bytes: Uint8Array }
+  | { kind: 'empty' }
+  | { kind: 'oversize' }
+  | { kind: 'stream_failure' };
+
+async function readBounded(stream: ReadableStream<Uint8Array>, maxBytes: number): Promise<BoundedRead> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        return { kind: 'oversize' };
+      }
+      chunks.push(value);
+    }
+  } catch {
+    return { kind: 'stream_failure' };
+  }
+  if (total === 0) return { kind: 'empty' };
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { kind: 'ok', bytes };
+}
+
+function dispositionedError(message: string, disposition: 'permanent' | 'transient'): Error {
+  return Object.assign(new Error(message), { disposition });
 }
 
 export type DeliveryLogEvent = Record<string, unknown>;
@@ -147,6 +190,10 @@ export class FeishuDeliveryDispatcher {
         const uuid = derivePartUuid(delivery.idempotencyKey, index, 'text');
         lastReceipt = await this.#feishu.send(target, { kind: 'text', text: part, uuid });
       }
+      for (const [index, attachment] of (delivery.attachments ?? []).entries()) {
+        const uuid = derivePartUuid(delivery.idempotencyKey, index, 'attachment');
+        lastReceipt = await this.#sendAttachment(target, attachment, uuid);
+      }
     } catch (error) {
       const errorClass = error instanceof Error ? error.name : 'UnknownError';
       if (typeof error === 'object' && error !== null && 'disposition' in error && error.disposition === 'permanent') {
@@ -160,6 +207,28 @@ export class FeishuDeliveryDispatcher {
     const receipt: DeliveryReceipt =
       target.kind === 'user' && lastReceipt?.chatId ? { threadRef: `feishu:dm:${lastReceipt.chatId}` } : {};
     await this.#ack(delivery, receipt);
+  }
+
+  async #sendAttachment(target: FeishuTarget, attachment: DeliveryAttachment, uuid: string): Promise<MessageReceipt> {
+    const stream =
+      attachment.kind === 'blob'
+        ? await this.#qm.readBlob(attachment.id)
+        : await this.#qm.readFileArtifact(attachment.id, attachment.viewerId ?? '');
+    const feishuKind: 'image' | 'file' = attachment.mediaType.startsWith('image/') ? 'image' : 'file';
+    const maxBytes = feishuKind === 'image' ? MAX_IMAGE_BYTES : MAX_FILE_BYTES;
+    const read = await readBounded(stream, maxBytes);
+    if (read.kind !== 'ok') {
+      throw dispositionedError(`attachment_${read.kind}`, read.kind === 'stream_failure' ? 'transient' : 'permanent');
+    }
+    const resourceKey = await this.#feishu.upload({
+      bytes: read.bytes,
+      filename: attachment.filename,
+      mediaType: attachment.mediaType,
+      kind: feishuKind,
+    });
+    const message: OutgoingMessage =
+      resourceKey.kind === 'image' ? { kind: 'image', imageKey: resourceKey.key, uuid } : { kind: 'file', fileKey: resourceKey.key, uuid };
+    return this.#feishu.send(target, message);
   }
 
   async #ack(delivery: Delivery, receipt?: DeliveryReceipt): Promise<void> {
