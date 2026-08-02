@@ -301,3 +301,37 @@ test('classifies successful response body stream failures as network errors', as
 
   await assert.rejects(client.probe(), QmNetworkError);
 });
+
+test('preserves a configured base path in the signed wire URL', async () => {
+  const calls: CapturedCall[] = [];
+  const client = new QmHttpClient({
+    baseUrl: 'https://gateway.test/qm-core/',
+    signingSecret: 'contract-secret',
+    now: () => 1_700_000_000_000,
+    fetch: recordingFetch([json({ ok: true })], calls),
+  });
+
+  await client.probe();
+  const request = calls[0];
+  assert.ok(request);
+  assert.equal(new URL(request.url).pathname, '/qm-core/healthz');
+  assert.equal(
+    new Headers(request.init.headers).get('x-signature'),
+    signRequest('contract-secret', 1_700_000_000, 'GET\n/qm-core/healthz\n'),
+  );
+});
+
+test('extracts a safe refusal reason without exposing upstream messages', async () => {
+  const client = new QmHttpClient({
+    baseUrl: 'http://qm.test',
+    signingSecret: 'contract-secret',
+    fetch: recordingFetch([json({ reason: 'signals_unavailable', message: 'tenant payload' }, 409)], []),
+  });
+
+  await assert.rejects(client.signalRun('run_test_1', { kind: 'abort' }), (error: unknown) => {
+    assert.ok(error instanceof QmPermanentError);
+    assert.equal(error.errorCode, 'signals_unavailable');
+    assert.doesNotMatch(error.message, /tenant payload/);
+    return true;
+  });
+});
