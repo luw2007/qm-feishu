@@ -4,3 +4,5 @@
 - Shared ports use Web `ReadableStream<Uint8Array>` so surface modules remain independent of Node and vendor SDK stream types.
 - Threshold defaults remain configuration fields; the 30 MB Feishu upload ceiling is a protocol limit, not an operator tuning threshold.
 - The public package exports one runtime value, `startFeishuSurface`; all other public exports are TypeScript types.
+- Health starts before external dependency probes: invalid configuration still fails fast, while valid processes remain live with readiness false and retry QM/Feishu connectivity.
+- Runtime recovery reuses `FEISHU_DELIVERY_POLL_MS`; the removed `CORE_RETRY_COUNT` field had no consumer and would have advertised behavior the adapter did not implement.

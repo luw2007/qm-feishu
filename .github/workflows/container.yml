@@ -1,0 +1,74 @@
+name: Container
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t qm-feishu:ci .
+
+      - name: Verify non-root user
+        run: |
+          user="$(docker run --rm qm-feishu:ci node -e 'console.log(process.getuid())')"
+          test "$user" != "0"
+
+      - name: Verify minimal application filesystem
+        run: |
+          docker create --name qm-feishu-inspect qm-feishu:ci
+          docker export qm-feishu-inspect | tar -tf - > /tmp/image-files.txt
+          docker rm -f qm-feishu-inspect
+          grep -q '^app/dist/main.js$' /tmp/image-files.txt
+          grep -q '^app/package.json$' /tmp/image-files.txt
+          ! grep -E '^app/(src|test|docs|fixtures)/' /tmp/image-files.txt
+          ! grep -E '^app/\.env($|\.)' /tmp/image-files.txt
+
+      - name: Verify liveness and unavailable readiness
+        run: |
+          docker run -d --name qm-feishu-live \
+            -e CORE_API_URL=http://127.0.0.1:18080 \
+            -e CORE_SIGNING_SECRET=ci-only-synthetic-secret-000000001 \
+            -e FEISHU_APP_ID=cli_ci_test_app \
+            -e FEISHU_APP_SECRET=ci-only-synthetic-app-secret \
+            -e FEISHU_BOT_OPEN_ID=ou_ci_test_bot \
+            -e FEISHU_TENANT_KEY=tenant_ci_test \
+            -e CORE_REQUEST_TIMEOUT_MS=100 \
+            -p 3000:3000 \
+            qm-feishu:ci
+          for i in $(seq 1 15); do
+            if curl -fsS http://127.0.0.1:3000/healthz; then break; fi
+            if [ "$i" -eq 15 ]; then
+              docker logs qm-feishu-live
+              exit 1
+            fi
+            sleep 2
+          done
+          code="$(curl -sS -o /tmp/ready.json -w '%{http_code}' http://127.0.0.1:3000/readyz)"
+          test "$code" = "503"
+          docker stop qm-feishu-live
+          docker rm qm-feishu-live
+
+      - name: Verify shutdown on SIGTERM
+        run: |
+          docker run -d --name qm-feishu-shutdown \
+            -e CORE_API_URL=http://127.0.0.1:18080 \
+            -e CORE_SIGNING_SECRET=ci-only-synthetic-secret-000000001 \
+            -e FEISHU_APP_ID=cli_ci_test_app \
+            -e FEISHU_APP_SECRET=ci-only-synthetic-app-secret \
+            -e FEISHU_BOT_OPEN_ID=ou_ci_test_bot \
+            -e FEISHU_TENANT_KEY=tenant_ci_test \
+            qm-feishu:ci
+          sleep 3
+          docker stop --time 20 qm-feishu-shutdown
+          code="$(docker inspect qm-feishu-shutdown --format '{{.State.ExitCode}}')"
+          docker rm qm-feishu-shutdown
+          test "$code" = "0"

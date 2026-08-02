@@ -4,8 +4,15 @@ import { parseDeliveryTarget } from './deliveries.js';
 
 type LogFn = (event: Record<string, unknown>) => void;
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.resolve();
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  const timer = setTimeout(() => { resolve(undefined); }, ms);
+  signal?.addEventListener('abort', () => {
+    clearTimeout(timer);
+    resolve(undefined);
+  }, { once: true });
+  return promise;
 }
 
 export function deriveApprovalIdempotencyKey(requestId: string, action: string, eventId: string): string {
@@ -24,11 +31,13 @@ export type WatchApprovalOptions = {
   renderCard: (approval: ApprovalView) => OutgoingMessage;
   pollIntervalMs?: number;
   log?: LogFn;
+  signal?: AbortSignal;
 };
 
 export type WatchApprovalOutcome =
   | { kind: 'card_sent'; requestId: string }
-  | { kind: 'terminal'; status: RunView['status'] };
+  | { kind: 'terminal'; status: RunView['status'] }
+  | { kind: 'cancelled' };
 
 const ACTIVE_RUN_STATUSES: ReadonlySet<RunView['status']> = new Set(['queued', 'running']);
 
@@ -47,12 +56,15 @@ export async function watchApproval(
   const log = options.log ?? (() => undefined);
 
   for (;;) {
+    if (options.signal?.aborted) return { kind: 'cancelled' };
     const run = await ports.qm.getRun(input.runId);
+    if (options.signal?.aborted) return { kind: 'cancelled' };
     if (!ACTIVE_RUN_STATUSES.has(run.status)) {
       return { kind: 'terminal', status: run.status };
     }
 
     const approval = await ports.qm.pendingApproval(input.threadRef);
+    if (options.signal?.aborted) return { kind: 'cancelled' };
     if (approval) {
       const target = parseDeliveryTarget(input.destination);
       if (!target) throw new Error(`watchApproval: malformed destination ${input.destination}`);
@@ -61,7 +73,7 @@ export async function watchApproval(
       return { kind: 'card_sent', requestId: approval.requestId };
     }
 
-    await delay(pollIntervalMs);
+    await delay(pollIntervalMs, options.signal);
   }
 }
 
