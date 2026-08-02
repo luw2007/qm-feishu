@@ -441,11 +441,9 @@ void test('an accepted intake submits the decoded turn, acks the message, and st
   }
 });
 
-void test('a card action resolves through the in-memory approval context and returns a toast', async () => {
+void test('a card action after restart reconstructs continuation context from QM and returns a toast', async () => {
   const eventSource = controllableEventSource();
   const continuationTurns: unknown[] = [];
-  let cardsSent = 0;
-
   const deps: RuntimeDeps = {
     createQmClient: () =>
       fakeQm({
@@ -453,40 +451,41 @@ void test('a card action resolves through the in-memory approval context and ret
           continuationTurns.push(turn);
           return { runId: 'run_test_1', queued: true, steered: false };
         },
-        getRun: async () => ({ runId: 'run_test_1', status: 'running' }),
-        pendingApproval: async () => ({
-          requestId: 'req_test_1',
-          status: 'pending',
-          grantModes: { once: true, session: false, always: false },
-        }),
         getApproval: async () => ({
           requestId: 'req_test_1',
           status: 'pending',
           grantModes: { once: true, session: false, always: false },
-          request: { actor: { externalId: 'ou_test_operator_1' } },
+          request: {
+            actor: { externalId: 'ou_test_operator_1' },
+            surface: 'feishu',
+            deliveryTarget: 'chat:oc_test_dm_1:message:om_test_1',
+            conversation: {
+              kind: 'dm',
+              threadRef: 'feishu:dm:oc_test_dm_1',
+              channelRef: 'oc_test_dm_1',
+            },
+          },
         }),
       }),
-    createFeishuClient: () =>
-      fakeFeishu({
-        send: async () => {
-          cardsSent += 1;
-          return { messageId: 'om_test_card_1' };
-        },
-      }),
+    createFeishuClient: () => fakeFeishu(),
     createEventSource: () => eventSource.source,
-    renderApprovalCard: (approval) => ({ kind: 'text', text: `card:${approval.requestId}`, uuid: 'test-uuid' }),
   };
 
   const handle = await runFeishuSurface(testConfig(), deps);
   try {
-    await eventSource.emitMessage(messageFixture());
-    await waitFor(() => cardsSent >= 1);
-
     const response = await eventSource.emitCardAction(cardActionFixture());
     assert.deepEqual(response, { toast: { type: 'success', content: 'Approved.' } });
 
-    await waitFor(() => continuationTurns.length >= 2);
-    const continuation = continuationTurns[1] as { approval?: { requestId: string; approved: boolean } };
+    await waitFor(() => continuationTurns.length === 1);
+    const continuation = continuationTurns[0] as {
+      threadRef?: string;
+      destination?: string;
+      conversation?: { id: string; kind: string };
+      approval?: { requestId: string; approved: boolean; scope?: string };
+    };
+    assert.equal(continuation.threadRef, 'feishu:dm:oc_test_dm_1');
+    assert.equal(continuation.destination, 'chat:oc_test_dm_1:message:om_test_1');
+    assert.deepEqual(continuation.conversation, { id: 'oc_test_dm_1', kind: 'dm' });
     assert.deepEqual(continuation.approval, { requestId: 'req_test_1', approved: true, scope: 'once' });
   } finally {
     await handle.stop();

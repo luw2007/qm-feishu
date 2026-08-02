@@ -5,7 +5,6 @@ import { renderApprovalCard } from '../../src/feishu/cards.js';
 import type { FeishuPort, QmPort } from '../../src/ports.js';
 import type {
   ApprovalView,
-  FeishuConversation,
   FeishuTarget,
   NormalizedCardAction,
   OutgoingMessage,
@@ -75,7 +74,16 @@ function approvalFixture(overrides: Partial<ApprovalView> = {}): ApprovalView {
     status: 'pending',
     command: 'rm -rf /tmp/scratch',
     grantModes: { once: true, session: true, always: true },
-    request: { actor: { externalId: 'ou_test_requester_1', displayName: 'Ann' } },
+    request: {
+      actor: { externalId: 'ou_test_requester_1', displayName: 'Ann' },
+      surface: 'feishu',
+      deliveryTarget: 'chat:oc_test_dm_1:message:om_test_1',
+      conversation: {
+        kind: 'dm',
+        threadRef: 'feishu:dm:oc_test_dm_1',
+        channelRef: 'oc_test_dm_1',
+      },
+    },
     ...overrides,
   };
 }
@@ -90,13 +98,6 @@ function actionFixture(overrides: Partial<NormalizedCardAction> = {}): Normalize
   };
 }
 
-function contextFixture(): { threadRef: string; destination: string; conversation: FeishuConversation } {
-  return {
-    threadRef: 'feishu:dm:oc_test_dm_1',
-    destination: 'chat:oc_test_dm_1:message:om_test_1',
-    conversation: { id: 'oc_test_dm_1', kind: 'dm' },
-  };
-}
 
 function cardButtons(card: Record<string, unknown>): Array<{ action?: unknown; requestId?: unknown } & Record<string, unknown>> {
   const elements = card.elements as Array<Record<string, unknown>>;
@@ -143,6 +144,14 @@ test('renderApprovalCard never leaks actor or command authority into the card va
     assert.equal('command' in value, false);
     assert.equal('externalId' in value, false);
   }
+});
+
+test('renderApprovalCard shows untrusted command content as plain text', () => {
+  const card = renderApprovalCard(approvalFixture({ command: '` [spoof](https://attacker.invalid) @all' }));
+  const elements = card.card.elements as Array<Record<string, unknown>>;
+  const text = elements[0]?.text as Record<string, unknown>;
+  assert.equal(text.tag, 'plain_text');
+  assert.equal(text.content, 'Approval requested:\n` [spoof](https://attacker.invalid) @all');
 });
 
 // --- deriveApprovalIdempotencyKey ----------------------------------------
@@ -256,7 +265,7 @@ test('handleCardAction returns its response before the QM continuation settles',
   });
 
   const result = await Promise.race([
-    handleCardAction(actionFixture(), contextFixture(), { qm }),
+    handleCardAction(actionFixture(), { qm }),
     delay(50).then(() => 'timed_out' as const),
   ]);
 
@@ -282,7 +291,7 @@ test('handleCardAction accepts a matching operator and maps the scope exactly', 
     ['allow_session', 'session'],
     ['allow_always', 'always'],
   ] as const) {
-    const { outcome } = await handleCardAction(actionFixture({ action }), contextFixture(), { qm });
+    const { outcome } = await handleCardAction(actionFixture({ action }), { qm });
     assert.deepEqual(outcome, { kind: 'accepted', requestId: 'req_test_1', scope });
   }
   await delay(5);
@@ -307,7 +316,7 @@ test('handleCardAction: deny never carries an approval scope', async () => {
     },
   });
 
-  const { outcome } = await handleCardAction(actionFixture({ action: 'deny' }), contextFixture(), { qm });
+  const { outcome } = await handleCardAction(actionFixture({ action: 'deny' }), { qm });
 
   assert.deepEqual(outcome, { kind: 'denied', requestId: 'req_test_1' });
   await delay(5);
@@ -327,7 +336,7 @@ test('handleCardAction reloads the current approval from QM rather than trusting
     submitTurn: async () => ({ runId: 'run_test_1', queued: true }),
   });
 
-  await handleCardAction(actionFixture(), contextFixture(), { qm });
+  await handleCardAction(actionFixture(), { qm });
 
   assert.equal(getApprovalCalls, 1);
 });
@@ -342,7 +351,7 @@ test('handleCardAction fails closed and never continues when the operator does n
     },
   });
 
-  const { outcome } = await handleCardAction(actionFixture({ operatorOpenId: 'ou_test_impostor_1' }), contextFixture(), { qm });
+  const { outcome } = await handleCardAction(actionFixture({ operatorOpenId: 'ou_test_impostor_1' }), { qm });
 
   assert.deepEqual(outcome, { kind: 'mismatch', requestId: 'req_test_1' });
   assert.equal(submitTurnCalls, 0);
@@ -360,7 +369,7 @@ test('handleCardAction fails closed when the approval has no originating request
     },
   });
 
-  const { outcome } = await handleCardAction(actionFixture(), contextFixture(), { qm });
+  const { outcome } = await handleCardAction(actionFixture(), { qm });
 
   assert.deepEqual(outcome, { kind: 'mismatch', requestId: 'req_test_1' });
   assert.equal(submitTurnCalls, 0);
@@ -376,7 +385,7 @@ test('handleCardAction fails closed when the approval is no longer pending (stal
     },
   });
 
-  const { outcome } = await handleCardAction(actionFixture(), contextFixture(), { qm });
+  const { outcome } = await handleCardAction(actionFixture(), { qm });
 
   assert.deepEqual(outcome, { kind: 'stale', requestId: 'req_test_1' });
   assert.equal(submitTurnCalls, 0);
@@ -392,7 +401,7 @@ test('handleCardAction fails closed when the approval no longer exists', async (
     },
   });
 
-  const { outcome } = await handleCardAction(actionFixture(), contextFixture(), { qm });
+  const { outcome } = await handleCardAction(actionFixture(), { qm });
 
   assert.deepEqual(outcome, { kind: 'missing', requestId: 'req_test_1' });
   assert.equal(submitTurnCalls, 0);
@@ -408,7 +417,7 @@ test('handleCardAction fails closed when the requested scope was never granted (
     },
   });
 
-  const { outcome } = await handleCardAction(actionFixture({ action: 'allow_session' }), contextFixture(), { qm });
+  const { outcome } = await handleCardAction(actionFixture({ action: 'allow_session' }), { qm });
 
   assert.deepEqual(outcome, { kind: 'malformed', requestId: 'req_test_1' });
   assert.equal(submitTurnCalls, 0);
@@ -427,8 +436,8 @@ test('handleCardAction: repeated identical callbacks derive the same continuatio
   });
   const action = actionFixture();
 
-  await handleCardAction(action, contextFixture(), { qm });
-  await handleCardAction(action, contextFixture(), { qm });
+  await handleCardAction(action, { qm });
+  await handleCardAction(action, { qm });
   await delay(5);
 
   assert.equal(submitted.length, 2);

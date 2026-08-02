@@ -149,6 +149,17 @@ test('handleIncomingMessage: direct messages are always accepted and map open_id
   assert.equal(turn.idempotencyKey, 'feishu:message:om_test_1');
 });
 
+test('handleIncomingMessage: non-user senders are ignored instead of being attributed as human', async () => {
+  const qm = fakeQm();
+  const feishu = fakeFeishu(qm.order);
+  const outcome = await handleIncomingMessage(baseMessage({ senderType: 'bot' }), { qm: qm.port, feishu: feishu.port }, {
+    botOpenId: BOT_OPEN_ID,
+    tenantKey: TENANT_KEY,
+  });
+  assert.deepEqual(outcome, { kind: 'ignored', reason: 'non_user_sender' });
+  assert.equal(qm.calls.submitTurn.length, 0);
+});
+
 test('handleIncomingMessage: group messages that explicitly mention the bot exactly once are accepted', async () => {
   const qm = fakeQm();
   const feishu = fakeFeishu(qm.order);

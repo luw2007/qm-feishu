@@ -378,6 +378,30 @@ test('FeishuSdkClient: classifies a response-less network failure as FeishuUnava
   await assert.rejects(() => client.reply('om_test_1', { kind: 'text', text: 'hi', uuid: 'u1' }), FeishuUnavailableError);
 });
 
+test('FeishuSdkClient: classifies a 2xx application frequency-limit code as retryable', async () => {
+  const client = new FeishuSdkClient({
+    appId: 'cli_test_1',
+    appSecret: 'secret_test_1',
+    client: fakeApiClient({
+      message: {
+        reply: async () => ({ code: 99991400, msg: 'frequency limit' }),
+        create: async () => ({ data: { message_id: 'om_test_x' } }),
+        patch: async () => ({ code: 0 }),
+      },
+    }),
+  });
+
+  await assert.rejects(
+    () => client.reply('om_test_1', { kind: 'text', text: 'hi', uuid: 'u1' }),
+    (error: unknown) => {
+      assert.ok(error instanceof FeishuRateLimitedError);
+      assert.equal(error.status, 200);
+      assert.equal(error.feishuCode, 99991400);
+      return true;
+    },
+  );
+});
+
 test('FeishuSdkClient: raises a permanent error when a 2xx response carries a non-zero business code', async () => {
   const client = new FeishuSdkClient({
     appId: 'cli_test_1',

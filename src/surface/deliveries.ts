@@ -85,6 +85,11 @@ function dispositionedError(message: string, disposition: 'permanent' | 'transie
   return Object.assign(new Error(message), { disposition });
 }
 
+function requireViewerId(attachment: DeliveryAttachment): string {
+  if (!attachment.viewerId) throw dispositionedError('attachment_missing_viewer', 'permanent');
+  return attachment.viewerId;
+}
+
 export type DeliveryLogEvent = Record<string, unknown>;
 
 export type DeliveryDispatcherOptions = {
@@ -210,10 +215,9 @@ export class FeishuDeliveryDispatcher {
   }
 
   async #sendAttachment(target: FeishuTarget, attachment: DeliveryAttachment, uuid: string): Promise<MessageReceipt> {
-    const stream =
-      attachment.kind === 'blob'
-        ? await this.#qm.readBlob(attachment.id)
-        : await this.#qm.readFileArtifact(attachment.id, attachment.viewerId ?? '');
+    const stream = attachment.kind === 'blob'
+      ? await this.#qm.readBlob(attachment.id)
+      : await this.#qm.readFileArtifact(attachment.id, requireViewerId(attachment));
     const feishuKind: 'image' | 'file' = attachment.mediaType.startsWith('image/') ? 'image' : 'file';
     const maxBytes = feishuKind === 'image' ? MAX_IMAGE_BYTES : MAX_FILE_BYTES;
     const read = await readBounded(stream, maxBytes);

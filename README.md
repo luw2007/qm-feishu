@@ -111,6 +111,10 @@ npm run test:qm-contract
 
 The compatibility envelope is recorded in `package.json` and `docs/compatibility.md`. QM HTTP routes are treated as observed external contracts, not a stable upstream SDK.
 
+## Release
+
+`0.1.0` is container-first; npm publication is intentionally disabled. Complete `docs/live-test-runbook.md`, obtain passing CI and Container runs, and record the immutable image digest before pushing tag `v0.1.0`. The tag-gated Release workflow rejects pending or unchecked evidence, publishes `ghcr.io/luw2007/qm-feishu:0.1.0`, and creates the GitHub release.
+
 ## License
 
 MIT

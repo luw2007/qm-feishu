@@ -397,6 +397,27 @@ test('FeishuDeliveryDispatcher: a non-image attachment over the image ceiling bu
   assert.deepEqual(acked, ['delivery_test_1']);
 });
 
+test('FeishuDeliveryDispatcher: a file artifact without viewer identity fails closed as terminal', async () => {
+  let readCalls = 0;
+  const acked: string[] = [];
+  const attachment = fileAttachment();
+  delete attachment.viewerId;
+  const qm = fakeDeliveryQm({
+    claimDeliveries: async () => [delivery({ attachments: [attachment] })],
+    readFileArtifact: async () => {
+      readCalls += 1;
+      return streamOf(new Uint8Array([1]));
+    },
+    ackDelivery: async (id) => { acked.push(id); },
+  });
+  const dispatcher = new FeishuDeliveryDispatcher({ qm, feishu: fakeDeliveryFeishu() });
+
+  await dispatcher.poll();
+
+  assert.equal(readCalls, 0);
+  assert.deepEqual(acked, ['delivery_test_1']);
+});
+
 test('FeishuDeliveryDispatcher: an oversized outbound attachment is a permanent terminal failure that acks once without uploading', async () => {
   const acked: string[] = [];
   let uploadCalls = 0;

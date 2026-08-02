@@ -74,20 +74,39 @@ test('delivery decoder rejects leakage while mapping QM destinations and attachm
   );
 });
 
-test('approval decoder exposes only the actor identity required by the port', () => {
+test('approval decoder preserves the authoritative QM continuation context without exposing message text', () => {
   assert.deepEqual(
     decodeApproval({
       requestId: 'approval_test_1',
       command: 'deploy',
       grantModes: { session: true, always: false },
-      request: { actor: { externalId: 'ou_test_1', displayName: 'Test User' }, text: 'secret body' },
+      request: {
+        actor: { externalId: 'ou_test_1', displayName: 'Test User' },
+        surface: 'feishu',
+        deliveryTarget: 'chat:oc_test_1:message:om_test_1',
+        conversation: {
+          kind: 'dm',
+          threadRef: 'feishu:dm:oc_test_1',
+          channelRef: 'oc_test_1',
+        },
+        text: 'secret body',
+      },
     }),
     {
       requestId: 'approval_test_1',
       status: 'pending',
       command: 'deploy',
       grantModes: { once: true, session: true, always: false },
-      request: { actor: { externalId: 'ou_test_1', displayName: 'Test User' } },
+      request: {
+        actor: { externalId: 'ou_test_1', displayName: 'Test User' },
+        surface: 'feishu',
+        deliveryTarget: 'chat:oc_test_1:message:om_test_1',
+        conversation: {
+          kind: 'dm',
+          threadRef: 'feishu:dm:oc_test_1',
+          channelRef: 'oc_test_1',
+        },
+      },
     },
   );
 });

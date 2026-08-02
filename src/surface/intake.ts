@@ -12,7 +12,7 @@ export type IntakeOptions = {
 export type IntakeOutcome =
   | { kind: 'accepted'; runId: string; threadRef: string; destination: string; steered: boolean }
   | { kind: 'signaled'; runId: string; threadRef: string }
-  | { kind: 'ignored'; reason: 'self' | 'unmentioned' | 'unsupported_message_type' }
+  | { kind: 'ignored'; reason: 'self' | 'non_user_sender' | 'unmentioned' | 'unsupported_message_type' }
   | {
       kind: 'rejected';
       reason:
@@ -132,6 +132,9 @@ export async function handleIncomingMessage(
   }
   if (message.senderOpenId === options.botOpenId) {
     return { kind: 'ignored', reason: 'self' };
+  }
+  if (message.senderType !== 'user') {
+    return { kind: 'ignored', reason: 'non_user_sender' };
   }
 
   if (message.chatType === 'group') {

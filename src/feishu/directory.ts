@@ -1,5 +1,5 @@
 import type { DirectoryBatch } from '../types.js';
-import { FeishuPermanentError } from './client.js';
+import { feishuResponseError } from './client.js';
 
 export type FeishuDirectoryApiClient = {
   im: {
@@ -33,7 +33,7 @@ export async function fetchFeishuDirectory(client: FeishuDirectoryApiClient): Pr
       params: { page_size: 100, ...(chatPageToken ? { page_token: chatPageToken } : {}) },
     });
     if (chatResponse.code !== undefined && chatResponse.code !== 0) {
-      throw new FeishuPermanentError(200, chatResponse.code);
+      throw feishuResponseError(200, chatResponse.code);
     }
     for (const item of chatResponse.data?.items ?? []) {
       if (!item.chat_id) continue;
@@ -46,7 +46,7 @@ export async function fetchFeishuDirectory(client: FeishuDirectoryApiClient): Pr
           path: { chat_id: item.chat_id },
         });
         if (memberResponse.code !== undefined && memberResponse.code !== 0) {
-          throw new FeishuPermanentError(200, memberResponse.code);
+          throw feishuResponseError(200, memberResponse.code);
         }
         for (const member of memberResponse.data?.items ?? []) {
           if (!member.member_id) continue;

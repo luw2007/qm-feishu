@@ -89,7 +89,7 @@ export function renderApprovalCard(approval: ApprovalView): { kind: 'card'; card
       elements: [
         {
           tag: 'div',
-          text: { tag: 'lark_md', content: approval.command ? `Approval requested:\n\`${approval.command}\`` : 'Approval requested' },
+          text: { tag: 'plain_text', content: approval.command ? `Approval requested:\n${approval.command}` : 'Approval requested' },
         },
         { tag: 'action', actions: buttons },
       ],

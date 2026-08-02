@@ -1,5 +1,5 @@
 import type { FeishuPort, QmPort } from '../ports.js';
-import type { ApprovalScope, ApprovalView, FeishuConversation, NormalizedCardAction, OutgoingMessage, RunView, SurfaceTurn } from '../types.js';
+import type { ApprovalScope, ApprovalView, NormalizedCardAction, OutgoingMessage, RunView, SurfaceTurn } from '../types.js';
 import { parseDeliveryTarget } from './deliveries.js';
 
 type LogFn = (event: Record<string, unknown>) => void;
@@ -79,11 +79,6 @@ export async function watchApproval(
 
 // --- callback: verify the operator, reload the approval, continue ---------
 
-export type ApprovalContinuationContext = {
-  threadRef: string;
-  destination: string;
-  conversation: FeishuConversation;
-};
 
 export type ApprovalActionOutcome =
   | { kind: 'accepted'; requestId: string; scope: ApprovalScope }
@@ -128,21 +123,24 @@ function toastFor(outcome: ApprovalActionOutcome): CardCallbackResponse {
  */
 export async function handleCardAction(
   action: NormalizedCardAction,
-  context: ApprovalContinuationContext,
   ports: { qm: QmPort },
   options: { log?: LogFn } = {},
 ): Promise<{ response: CardCallbackResponse; outcome: ApprovalActionOutcome }> {
   const log = options.log ?? (() => undefined);
   const approval = await ports.qm.getApproval(action.requestId);
+  const request = approval?.request;
 
   let outcome: ApprovalActionOutcome;
   if (!approval) {
     outcome = { kind: 'missing', requestId: action.requestId };
   } else if (approval.status !== 'pending') {
     outcome = { kind: 'stale', requestId: action.requestId };
-  } else if (!approval.request?.actor?.externalId) {
-    outcome = { kind: 'mismatch', requestId: action.requestId };
-  } else if (approval.request.actor.externalId !== action.operatorOpenId) {
+  } else if (
+    request?.actor.externalId !== action.operatorOpenId ||
+    request.surface !== 'feishu' ||
+    !request.deliveryTarget ||
+    !request.conversation
+  ) {
     outcome = { kind: 'mismatch', requestId: action.requestId };
   } else if (action.action === 'deny') {
     outcome = { kind: 'denied', requestId: action.requestId };
@@ -154,13 +152,23 @@ export async function handleCardAction(
 
   const response = toastFor(outcome);
 
-  if (outcome.kind === 'accepted' || outcome.kind === 'denied') {
+  if (
+    (outcome.kind === 'accepted' || outcome.kind === 'denied') &&
+    request?.conversation &&
+    request.deliveryTarget
+  ) {
+    const conversation = request.conversation;
+    const destination = request.deliveryTarget;
     const turn: SurfaceTurn = {
       text: '',
       actor: { externalId: action.operatorOpenId },
-      conversation: context.conversation,
-      threadRef: context.threadRef,
-      destination: context.destination,
+      conversation: {
+        id: conversation.channelRef,
+        kind: conversation.kind,
+      },
+      threadRef: conversation.threadRef,
+      destination,
+
       surface: 'feishu',
       addressed: true,
       surfaceTools: false,

@@ -202,7 +202,7 @@ test('binary reads and approval lookup use encoded identifiers and runtime valid
 
   assert.equal(await new Response(await client.readBlob('blob/test 1')).text(), 'blob-bytes');
   assert.equal(await new Response(await client.readFileArtifact('artifact/test 1', 'ou_test_1 / viewer')).text(), 'file-bytes');
-  assert.equal((await client.pendingApproval('feishu:dm:oc_test_1'))?.request?.actor?.externalId, 'ou_test_1');
+  assert.equal((await client.pendingApproval('feishu:dm:oc_test_1'))?.request?.actor.externalId, 'ou_test_1');
   assert.equal(await client.getApproval('missing/test'), null);
   assert.deepEqual(
     calls.map(({ url }) => new URL(url).pathname + new URL(url).search),

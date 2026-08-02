@@ -123,11 +123,21 @@ function retryAfterMs(headers: unknown): number | undefined {
   return Number.isFinite(seconds) && seconds >= 0 ? Math.ceil(seconds * 1_000) : undefined;
 }
 
+const FEISHU_FREQUENCY_LIMIT_CODE = 99991400;
+
+export function feishuResponseError(status: number, feishuCode: number): FeishuRequestError {
+  return feishuCode === FEISHU_FREQUENCY_LIMIT_CODE
+    ? new FeishuRateLimitedError(status, feishuCode)
+    : new FeishuPermanentError(status, feishuCode);
+}
+
 function classifyFeishuFailure(error: unknown): Error {
   const response = extractAxiosResponse(error);
   if (!response) return new FeishuUnavailableError();
   const feishuCode = extractFeishuCode(response.data);
-  if (response.status === 429) return new FeishuRateLimitedError(response.status, feishuCode, retryAfterMs(response.headers));
+  if (response.status === 429 || feishuCode === FEISHU_FREQUENCY_LIMIT_CODE) {
+    return new FeishuRateLimitedError(response.status, feishuCode, retryAfterMs(response.headers));
+  }
   if (response.status >= 500) return new FeishuTransientError(response.status, feishuCode);
   return new FeishuPermanentError(response.status, feishuCode);
 }
@@ -164,7 +174,7 @@ export class FeishuSdkClient implements FeishuPort {
 
   async probe(): Promise<void> {
     const response = await this.#call(() => this.#client.im.v1.chat.list({ params: { page_size: 1 } }));
-    if (response.code !== undefined && response.code !== 0) throw new FeishuPermanentError(200, response.code);
+    if (response.code !== undefined && response.code !== 0) throw feishuResponseError(200, response.code);
   }
 
   async reply(messageId: string, message: OutgoingMessage): Promise<MessageReceipt> {
@@ -175,7 +185,7 @@ export class FeishuSdkClient implements FeishuPort {
         path: { message_id: messageId },
       }),
     );
-    if (response.code !== undefined && response.code !== 0) throw new FeishuPermanentError(200, response.code);
+    if (response.code !== undefined && response.code !== 0) throw feishuResponseError(200, response.code);
     return decodeMessageReceipt(response);
   }
 
@@ -188,7 +198,7 @@ export class FeishuSdkClient implements FeishuPort {
         params: { receive_id_type: 'open_id' },
       }),
     );
-    if (response.code !== undefined && response.code !== 0) throw new FeishuPermanentError(200, response.code);
+    if (response.code !== undefined && response.code !== 0) throw feishuResponseError(200, response.code);
     return decodeMessageReceipt(response);
   }
 
@@ -197,7 +207,7 @@ export class FeishuSdkClient implements FeishuPort {
     const response = await this.#call(() =>
       this.#client.im.v1.message.patch({ data: { content: JSON.stringify(message.card) }, path: { message_id: messageId } }),
     );
-    if (response.code !== undefined && response.code !== 0) throw new FeishuPermanentError(200, response.code);
+    if (response.code !== undefined && response.code !== 0) throw feishuResponseError(200, response.code);
   }
 
   async download(resource: IncomingResource): Promise<ReadableStream<Uint8Array>> {

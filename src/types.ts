@@ -75,7 +75,14 @@ export type ApprovalView = {
     always: boolean;
   };
   request?: {
-    actor?: FeishuActor;
+    actor: FeishuActor;
+    surface?: string;
+    deliveryTarget?: string;
+    conversation?: {
+      kind: 'dm' | 'group';
+      threadRef: string;
+      channelRef: string;
+    };
   };
 };
 

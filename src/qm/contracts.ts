@@ -206,6 +206,20 @@ export function decodeApproval(value: unknown): ApprovalView {
     if (value.request.actor.displayName !== undefined && typeof value.request.actor.displayName !== 'string') {
       throw new QmContractError();
     }
+    const conversation = value.request.conversation;
+    if (
+      conversation !== undefined &&
+      (!isObject(conversation) ||
+        (conversation.kind !== 'dm' && conversation.kind !== 'group') ||
+        !nonEmptyString(conversation.threadRef) ||
+        !nonEmptyString(conversation.channelRef))
+    ) {
+      throw new QmContractError();
+    }
+    if (value.request.surface !== undefined && typeof value.request.surface !== 'string') throw new QmContractError();
+    if (value.request.deliveryTarget !== undefined && typeof value.request.deliveryTarget !== 'string') {
+      throw new QmContractError();
+    }
     request = {
       actor: {
         externalId: value.request.actor.externalId,
@@ -213,6 +227,17 @@ export function decodeApproval(value: unknown): ApprovalView {
           ? { displayName: value.request.actor.displayName }
           : {}),
       },
+      ...(typeof value.request.surface === 'string' ? { surface: value.request.surface } : {}),
+      ...(typeof value.request.deliveryTarget === 'string' ? { deliveryTarget: value.request.deliveryTarget } : {}),
+      ...(isObject(conversation)
+        ? {
+            conversation: {
+              kind: conversation.kind as 'dm' | 'group',
+              threadRef: conversation.threadRef as string,
+              channelRef: conversation.channelRef as string,
+            },
+          }
+        : {}),
     };
   }
 

@@ -7,3 +7,4 @@ coverage/
 *.log
 *.payload.json
 .DS_Store
+mcp-gateway/
