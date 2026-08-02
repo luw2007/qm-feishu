@@ -1,0 +1,20 @@
+{
+  "schema": "2.0",
+  "header": {
+    "event_id": "evt_test_card_1",
+    "token": "verify_test",
+    "create_time": "1700000006000",
+    "event_type": "card.action.trigger",
+    "tenant_key": "tenant_test_1",
+    "app_id": "cli_test_1"
+  },
+  "event": {
+    "operator": { "open_id": "ou_test_operator_1", "tenant_key": "tenant_test_1" },
+    "token": "verify_test",
+    "context": { "open_message_id": "om_test_card_1", "open_chat_id": "oc_test_dm_1" },
+    "action": {
+      "tag": "button",
+      "value": { "requestId": "req_test_1", "action": "allow_once" }
+    }
+  }
+}

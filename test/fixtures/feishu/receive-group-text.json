@@ -1,0 +1,24 @@
+{
+  "event_id": "evt_test_group_1",
+  "token": "verify_test",
+  "create_time": "1700000001000",
+  "event_type": "im.message.receive_v1",
+  "tenant_key": "tenant_test_1",
+  "app_id": "cli_test_1",
+  "sender": {
+    "sender_id": { "open_id": "ou_test_sender_2" },
+    "sender_type": "user",
+    "tenant_key": "tenant_test_1"
+  },
+  "message": {
+    "message_id": "om_test_group_1",
+    "create_time": "1700000001000",
+    "chat_id": "oc_test_group_1",
+    "chat_type": "group",
+    "message_type": "text",
+    "content": "{\"text\":\"@_user_1 please review\"}",
+    "mentions": [
+      { "key": "@_user_1", "id": { "open_id": "ou_test_mentioned_1" }, "name": "Bob", "tenant_key": "tenant_test_1" }
+    ]
+  }
+}

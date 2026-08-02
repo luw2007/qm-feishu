@@ -17,7 +17,6 @@ test('FeishuSdkEventSource.start: registers im.message.receive_v1 and forwards t
         return undefined;
       },
     }),
-    createCardActionHandler: () => ({}),
     createWsClient: () => ({
       start: async (params) => {
         startedWith = params;
