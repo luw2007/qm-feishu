@@ -131,7 +131,13 @@ test('handleIncomingMessage: direct messages are always accepted and map open_id
     tenantKey: TENANT_KEY,
   });
 
-  assert.deepEqual(outcome, { kind: 'accepted', runId: 'run_test_1', threadRef: 'feishu:dm:oc_test_dm_1', steered: false });
+  assert.deepEqual(outcome, {
+    kind: 'accepted',
+    runId: 'run_test_1',
+    threadRef: 'feishu:dm:oc_test_dm_1',
+    destination: 'chat:oc_test_dm_1:message:om_test_1',
+    steered: false,
+  });
   assert.equal(qm.calls.submitTurn.length, 1);
   const turn = qm.calls.submitTurn[0]!;
   assert.equal(turn.actor.externalId, 'ou_test_sender_1');
@@ -336,7 +342,13 @@ test('handleIncomingMessage: an ordinary follow-up while a run is active submits
     tenantKey: TENANT_KEY,
   });
 
-  assert.deepEqual(outcome, { kind: 'accepted', runId: 'run_active_1', threadRef: 'feishu:dm:oc_test_dm_1', steered: true });
+  assert.deepEqual(outcome, {
+    kind: 'accepted',
+    runId: 'run_active_1',
+    threadRef: 'feishu:dm:oc_test_dm_1',
+    destination: 'chat:oc_test_dm_1:message:om_test_1',
+    steered: true,
+  });
   assert.equal(qm.calls.signalRun.length, 0);
 });
 
@@ -395,6 +407,7 @@ test('handleIncomingMessage: returns the queued runId and threadRef for the appr
     kind: 'accepted',
     runId: 'run_test_1',
     threadRef: 'feishu:chat:oc_test_group_2:message:om_test_root_g1',
+    destination: 'chat:oc_test_group_2:message:om_test_root_g1',
     steered: false,
   });
 });

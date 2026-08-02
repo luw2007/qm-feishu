@@ -8,7 +8,7 @@ export type IntakeOptions = {
 };
 
 export type IntakeOutcome =
-  | { kind: 'accepted'; runId: string; threadRef: string; steered: boolean }
+  | { kind: 'accepted'; runId: string; threadRef: string; destination: string; steered: boolean }
   | { kind: 'signaled'; runId: string; threadRef: string }
   | { kind: 'ignored'; reason: 'self' | 'unmentioned' | 'unsupported_message_type' }
   | { kind: 'rejected'; reason: 'external_tenant' | 'missing_identity' | 'ambiguous_mention' }
@@ -112,5 +112,5 @@ export async function handleIncomingMessage(
     // Surface-cache publication is observable-only; it must never roll back an accepted turn.
   }
 
-  return { kind: 'accepted', runId: queued.runId, threadRef, steered: queued.steered === true };
+  return { kind: 'accepted', runId: queued.runId, threadRef, destination, steered: queued.steered === true };
 }

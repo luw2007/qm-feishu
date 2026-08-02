@@ -1,4 +1,4 @@
-import type { NormalizedCardAction } from '../types.js';
+import type { ApprovalScope, ApprovalView, NormalizedCardAction } from '../types.js';
 
 type JsonObject = Record<string, unknown>;
 
@@ -49,5 +49,50 @@ export function decodeCardAction(raw: unknown): NormalizedCardAction {
     operatorOpenId,
     requestId: value.requestId,
     action: value.action,
+  };
+}
+
+const GRANTABLE_ACTIONS: ReadonlyArray<{ action: CardActionKind; scope: ApprovalScope; label: string }> = [
+  { action: 'allow_once', scope: 'once', label: 'Allow once' },
+  { action: 'allow_session', scope: 'session', label: 'Allow for session' },
+  { action: 'allow_always', scope: 'always', label: 'Always allow' },
+];
+
+/**
+ * Card button values carry only requestId/action; authenticity comes from the
+ * verified callback operator and a server-side approval reload, never from
+ * card-embedded actor or command data.
+ */
+export function renderApprovalCard(approval: ApprovalView): { kind: 'card'; card: Record<string, unknown>; uuid: string } {
+  const grantedActions = GRANTABLE_ACTIONS.filter(({ scope }) => approval.grantModes[scope]);
+
+  const buttons = [
+    ...grantedActions.map(({ action, label }) => ({
+      tag: 'button',
+      text: { tag: 'plain_text', content: label },
+      type: 'primary',
+      value: { requestId: approval.requestId, action },
+    })),
+    {
+      tag: 'button',
+      text: { tag: 'plain_text', content: 'Deny' },
+      type: 'danger',
+      value: { requestId: approval.requestId, action: 'deny' },
+    },
+  ];
+
+  return {
+    kind: 'card',
+    uuid: `approval:${approval.requestId}`.slice(0, 50),
+    card: {
+      config: { wide_screen_mode: true },
+      elements: [
+        {
+          tag: 'div',
+          text: { tag: 'lark_md', content: approval.command ? `Approval requested:\n\`${approval.command}\`` : 'Approval requested' },
+        },
+        { tag: 'action', actions: buttons },
+      ],
+    },
   };
 }
