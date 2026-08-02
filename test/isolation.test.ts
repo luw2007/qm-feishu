@@ -14,14 +14,14 @@ async function filesUnder(directory: string): Promise<string[]> {
   return nested.flat();
 }
 
-test('exports one runtime entrypoint and public types only', () => {
+void test('exports one runtime entrypoint and public types only', () => {
   assert.deepEqual(Object.keys(publicApi), ['startFeishuSurface']);
 });
 
-test('contains no QM source dependency or checkout reference', async () => {
+void test('contains no QM source dependency or checkout reference', async () => {
   const manifest = await readFile('package.json', 'utf8');
-  const sourceFiles = await filesUnder('src');
-  const contents = await Promise.all(sourceFiles.map((file) => readFile(file, 'utf8')));
+  const scannedFiles = await Promise.all(['src', 'test'].map((directory) => filesUnder(directory)));
+  const contents = await Promise.all(scannedFiles.flat().map((file) => readFile(file, 'utf8')));
   const combined = `${manifest}\n${contents.join('\n')}`;
 
   assert.doesNotMatch(combined, /@yc-software\/qm|plugins\/chassis|(?:\.\.\/)+qm\/|~\/ai\/qm|github\.com\/(?:yc-software\/)?qm/);
@@ -31,7 +31,7 @@ test('contains no QM source dependency or checkout reference', async () => {
   }
 });
 
-test('fixtures contain synthetic Feishu identifiers only', async () => {
+void test('fixtures contain synthetic Feishu identifiers only', async () => {
   const fixtures = await filesUnder('test/fixtures').catch(() => []);
   for (const fixture of fixtures) {
     const content = await readFile(fixture, 'utf8');

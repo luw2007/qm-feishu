@@ -25,15 +25,14 @@
     "lint": "eslint .",
     "test": "node --import tsx --test 'test/**/*.test.ts'",
     "test:coverage": "node --import tsx --experimental-test-coverage --test 'test/**/*.test.ts'",
-    "test:qm-contract": "node --import tsx --test test/qm/contract.integration.test.ts",
-    "start": "node dist/cli.js"
+    "test:qm-contract": "node --import tsx --test test/qm/contract.integration.test.ts"
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "1.72.0"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@types/node": "26.1.2",
+    "@types/node": "24.13.3",
     "eslint": "10.8.0",
     "tsx": "4.23.4",
     "typescript": "6.0.2",
