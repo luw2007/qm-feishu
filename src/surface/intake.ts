@@ -12,7 +12,7 @@ export type IntakeOptions = {
 export type IntakeOutcome =
   | { kind: 'accepted'; runId: string; threadRef: string; destination: string; steered: boolean }
   | { kind: 'signaled'; runId: string; threadRef: string }
-  | { kind: 'ignored'; reason: 'self' | 'non_user_sender' | 'unmentioned' | 'unsupported_message_type' }
+  | { kind: 'ignored'; reason: 'self' | 'non_user_sender' | 'unmentioned' | 'unsupported_message_type' | 'duplicate' }
   | {
       kind: 'rejected';
       reason:
@@ -204,6 +204,7 @@ export async function handleIncomingMessage(
     }
     throw error;
   }
+  if ('replayed' in queued) return { kind: 'ignored', reason: 'duplicate' };
 
   await ports.feishu.reply(message.messageId, {
     kind: 'text',

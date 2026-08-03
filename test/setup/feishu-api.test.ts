@@ -155,6 +155,8 @@ test('FeishuSetupApi.configureApplication applies the complete minimal manifest 
     scope: {
       add_scopes: [
         { scope_name: 'im:message', token_type: 'tenant' },
+        { scope_name: 'im:message.p2p_msg:readonly', token_type: 'tenant' },
+        { scope_name: 'im:message.group_at_msg:readonly', token_type: 'tenant' },
         { scope_name: 'im:message:send_as_bot', token_type: 'tenant' },
         { scope_name: 'im:resource', token_type: 'tenant' },
         { scope_name: 'im:chat:readonly', token_type: 'tenant' },
@@ -180,7 +182,14 @@ test('FeishuSetupApi.configureApplication rejects a non-zero business response w
 
 test('FEISHU_SETUP_MANIFEST: is the exact minimal qm-feishu setup manifest', () => {
   assert.deepEqual(FEISHU_SETUP_MANIFEST, {
-    scopes: ['im:message', 'im:message:send_as_bot', 'im:resource', 'im:chat:readonly'],
+    scopes: [
+      'im:message',
+      'im:message.p2p_msg:readonly',
+      'im:message.group_at_msg:readonly',
+      'im:message:send_as_bot',
+      'im:resource',
+      'im:chat:readonly',
+    ],
     event: 'im.message.receive_v1',
     callback: 'card.action.trigger',
     mode: 'long-connection',

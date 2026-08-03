@@ -4,6 +4,8 @@ import type { FeishuEventSource } from '../ports.js';
 
 export const SETUP_SCOPES = [
   'im:message',
+  'im:message.p2p_msg:readonly',
+  'im:message.group_at_msg:readonly',
   'im:message:send_as_bot',
   'im:resource',
   'im:chat:readonly',

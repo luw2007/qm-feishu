@@ -47,7 +47,7 @@ const suppliedArgs: SetupArgs = {
   brand: 'lark',
 };
 
-test('runSetup verifies supplied credentials and atomically persists the six runtime keys', async () => {
+test('runSetup verifies supplied credentials and atomically persists the seven runtime keys', async () => {
   let exchanged: FeishuSetupCredentials | undefined;
   let persisted: { path: string; updates: Record<string, string> } | undefined;
   const lines: string[] = [];
@@ -86,6 +86,7 @@ test('runSetup verifies supplied credentials and atomically persists the six run
       FEISHU_APP_SECRET: 'secret_supplied_1',
       FEISHU_BOT_OPEN_ID: 'ou_test_bot_2',
       FEISHU_TENANT_KEY: 'tenant_test_2',
+      FEISHU_BRAND: 'lark',
     },
   });
   assert.deepEqual(result, { envFile: '/workspace/qm-feishu/config/runtime.env', brand: 'lark' });
@@ -97,6 +98,7 @@ test('runSetup registers an application and discovers a missing tenant key from 
   let sourceOptions: { appId: string; appSecret: string; brand: 'feishu' | 'lark' } | undefined;
   let handlers: Parameters<FeishuEventSource['start']>[0] | undefined;
   let persistedTenant: string | undefined;
+  let configured = false;
 
   await runSetup(
     {
@@ -108,7 +110,9 @@ test('runSetup registers an application and discovers a missing tenant key from 
     dependencies({
       createApi: () => ({
         exchangeTenantAccessToken: async () => ({ tenantAccessToken: 't-test-token', expiresInSeconds: 7_200 }),
-        configureApplication: async () => undefined,
+        configureApplication: async () => {
+          configured = true;
+        },
         probeBotInfo: async () => ({ openId: 'ou_registered_bot' }),
       }),
       createEventSource: (options) => {
@@ -135,6 +139,7 @@ test('runSetup registers an application and discovers a missing tenant key from 
     brand: 'feishu',
   });
   assert.equal(persistedTenant, 'tenant_discovered_1');
+  assert.equal(configured, false);
 });
 
 test('runSetup verifies an explicit tenant against a real event when Bot Info omits tenant_key', async () => {

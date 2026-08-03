@@ -32,8 +32,8 @@ Record only a timestamp and the last six characters of a synthetic message/event
 
 | Scenario | Expected result | UTC | Redacted ID | Pass |
 |---|---|---|---|---|
-| Direct text message | One QM turn, one acknowledgement, one final reply | PENDING | PENDING | [ ] |
-| Group mention | Exactly one explicit mention creates one turn | PENDING | PENDING | [ ] |
+| Direct text message | One QM turn, one acknowledgement, one final reply | 2026-08-03T12:25:46Z | `56294f` | [x] |
+| Group mention | Exactly one explicit mention creates one turn | 2026-08-03T15:00:14Z | `28ca66` | [ ] |
 | Unmentioned group message | No QM turn and no acknowledgement | PENDING | PENDING | [ ] |
 | Topic follow-up | Reply remains rooted at the topic root | PENDING | PENDING | [ ] |
 | Stop during active run | Active run receives abort; no second run | PENDING | PENDING | [ ] |
@@ -45,11 +45,17 @@ Record only a timestamp and the last six characters of a synthetic message/event
 | Deny | Matching requester continues with no approval scope | PENDING | PENDING | [ ] |
 | Absent approval request | Callback fails closed; no continuation | PENDING | PENDING | [ ] |
 | Non-requester approval | Callback fails closed; no continuation | PENDING | PENDING | [ ] |
-| Proactive principal delivery | Synthetic principal receives one DM; receipt records DM thread | PENDING | PENDING | [ ] |
+| Proactive principal delivery | Synthetic principal receives one DM; receipt records DM thread | 2026-08-03T12:42:20Z | `618d4c` | [x] |
 | Duplicate event replay | One effective QM turn | PENDING | PENDING | [ ] |
-| Transient Feishu send failure | Delivery remains unacked, recovers after lease, UUID remains stable | PENDING | PENDING | [ ] |
-| QM unavailable then recovers | Liveness stays `200`; readiness moves `503` to `200` | PENDING | PENDING | [ ] |
-| SIGTERM during active work | Intake stops and process exits within configured deadline | PENDING | PENDING | [ ] |
+| Transient Feishu send failure | Delivery remains unacked, recovers after lease, UUID remains stable | 2026-08-03T14:27:17Z | `b081b0` | [x] |
+| QM unavailable then recovers | Liveness stays `200`; readiness moves `503` to `200` | 2026-08-03T12:34:02Z | `N/A` | [x] |
+| SIGTERM during active work | Intake stops and process exits within configured deadline | 2026-08-03T12:34:02Z | `N/A` | [x] |
+
+## Current environment blockers
+
+The unchecked rows remain release blockers, not synthetic passes. A real user group mention reached the adapter through Web Messenger on 2026-08-03, but the old build failed before acknowledgement with `QmContractError`; a subsequent authoritative replay of the same idempotency key returned HTTP 200 `{ status: "silent", sessionId }`, exposing and driving a narrow decoder fix. This is not recorded as a passing group-mention smoke. The current workstation's own browsers still redirect to the tenant's conditional-access denial page for device MDM/OS policy, so further user actions must be performed from the separately accessible Web Messenger session. Bot-authored events and direct production-handler injection are not recorded as user-originated live evidence. Outgoing-file live verification also requires a working QM sandbox; the local backend reported that no Docker daemon was available.
+
+The acceptance OAuth probe did not provide a supported user-send path. Its local per-app user token was deleted. Open Platform retained `offline_access` as an OAuth base grant and accepted a deletion draft for the user identity of `im:message` while preserving the tenant/app grant. App version `1.0.6` remains audited but unpublished; direct lifecycle requests were rejected with platform code `10002`, so no remote version transition is claimed.
 
 ## Local and CI gates
 

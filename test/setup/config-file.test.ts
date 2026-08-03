@@ -38,10 +38,18 @@ function unquoteForTest(quoted: string): string {
   return out;
 }
 
-void test('MANAGED_KEYS lists exactly the six managed keys', () => {
+void test('MANAGED_KEYS lists exactly the seven managed keys', () => {
   assert.deepEqual(
     [...MANAGED_KEYS].sort(),
-    ['CORE_API_URL', 'CORE_SIGNING_SECRET', 'FEISHU_APP_ID', 'FEISHU_APP_SECRET', 'FEISHU_BOT_OPEN_ID', 'FEISHU_TENANT_KEY'].sort(),
+    [
+      'CORE_API_URL',
+      'CORE_SIGNING_SECRET',
+      'FEISHU_APP_ID',
+      'FEISHU_APP_SECRET',
+      'FEISHU_BOT_OPEN_ID',
+      'FEISHU_TENANT_KEY',
+      'FEISHU_BRAND',
+    ].sort(),
   );
 });
 

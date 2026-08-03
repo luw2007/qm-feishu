@@ -3,7 +3,7 @@ import type {
   BlobRef,
   Delivery,
   DeliveryAttachment,
-  QueuedRun,
+  TurnSubmission,
   RunView,
 } from '../types.js';
 
@@ -89,14 +89,29 @@ export class QmNetworkError extends Error {
   }
 }
 
-export function decodeQueuedRun(value: unknown): QueuedRun {
-  if (!isObject(value) || value.status !== 'queued' || !nonEmptyString(value.runId)) throw new QmContractError();
-  if (value.steered !== undefined && value.steered !== true) throw new QmContractError();
-  return {
-    runId: value.runId,
-    queued: true,
-    ...(value.steered === true ? { steered: true } : {}),
-  };
+export function decodeQueuedRun(value: unknown): TurnSubmission {
+  if (!isObject(value)) throw new QmContractError();
+  if (value.status === 'queued' && nonEmptyString(value.runId)) {
+    if (value.steered !== undefined && value.steered !== true) throw new QmContractError();
+    return {
+      runId: value.runId,
+      queued: true,
+      ...(value.steered === true ? { steered: true } : {}),
+    };
+  }
+  if (value.status === 'silent' && nonEmptyString(value.sessionId)) return { replayed: true };
+  if (
+    value.status === 'ok' &&
+    nonEmptyString(value.sessionId) &&
+    Number.isSafeInteger(value.sourceUserSeq) &&
+    (value.sourceUserSeq as number) >= 0 &&
+    Number.isSafeInteger(value.sourceAssistantEntrySeq) &&
+    (value.sourceAssistantEntrySeq as number) >= 0 &&
+    typeof value.reply === 'string'
+  ) {
+    return { replayed: true };
+  }
+  throw new QmContractError();
 }
 
 export function decodeRunView(runId: string, value: unknown): RunView {
@@ -258,8 +273,8 @@ export function decodeApproval(value: unknown): ApprovalView {
     ...(typeof value.command === 'string' ? { command: value.command } : {}),
     grantModes: {
       once: true,
-      session: grantModes.session === true,
-      always: grantModes.always === true,
+      session: grantModes.session !== false,
+      always: grantModes.always !== false,
     },
     ...(request ? { request } : {}),
   };

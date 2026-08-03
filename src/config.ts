@@ -5,6 +5,7 @@ export interface FeishuSurfaceConfig {
   feishuAppSecret: string;
   feishuBotOpenId: string;
   feishuTenantKey: string;
+  feishuBrand?: 'feishu' | 'lark';
   claimPrincipalDeliveries?: boolean;
   deliveryClaimMs?: number;
   deliveryPollMs?: number;
@@ -47,6 +48,12 @@ function level(value: string | undefined, fallback: (typeof LOG_LEVELS)[number])
   }
   return resolved as (typeof LOG_LEVELS)[number];
 }
+function brand(value: string | undefined): 'feishu' | 'lark' {
+  const resolved = value ?? 'feishu';
+  if (resolved !== 'feishu' && resolved !== 'lark') throw new Error('FEISHU_BRAND must be feishu or lark');
+  return resolved;
+}
+
 
 export function resolveConfig(config: FeishuSurfaceConfig): ResolvedFeishuSurfaceConfig {
   const coreApiUrl = required(config.coreApiUrl, 'CORE_API_URL').replace(/\/+$/, '');
@@ -67,6 +74,7 @@ export function resolveConfig(config: FeishuSurfaceConfig): ResolvedFeishuSurfac
     feishuAppSecret: required(config.feishuAppSecret, 'FEISHU_APP_SECRET'),
     feishuBotOpenId: required(config.feishuBotOpenId, 'FEISHU_BOT_OPEN_ID'),
     feishuTenantKey: required(config.feishuTenantKey, 'FEISHU_TENANT_KEY'),
+    feishuBrand: brand(config.feishuBrand),
     claimPrincipalDeliveries: config.claimPrincipalDeliveries ?? false,
     deliveryClaimMs: positive(config.deliveryClaimMs, 30_000, 'deliveryClaimMs'),
     deliveryPollMs: positive(config.deliveryPollMs, 1_000, 'deliveryPollMs'),
@@ -93,6 +101,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): FeishuSurfa
     feishuAppSecret: env.FEISHU_APP_SECRET ?? '',
     feishuBotOpenId: env.FEISHU_BOT_OPEN_ID ?? '',
     feishuTenantKey: env.FEISHU_TENANT_KEY ?? '',
+    ...(env.FEISHU_BRAND !== undefined ? { feishuBrand: env.FEISHU_BRAND as 'feishu' | 'lark' } : {}),
     claimPrincipalDeliveries: env.FEISHU_CLAIM_PRINCIPAL_DELIVERIES === '1',
     ...numField('deliveryClaimMs', env.FEISHU_DELIVERY_CLAIM_MS),
     ...numField('deliveryPollMs', env.FEISHU_DELIVERY_POLL_MS),

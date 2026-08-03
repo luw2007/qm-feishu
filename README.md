@@ -30,7 +30,9 @@ Create a Feishu/Lark application with these capabilities:
 - Subscribed event: `im.message.receive_v1` (direct messages and messages in groups where the app is mentioned).
 - Card callback: `card.action.trigger`, delivered over the same long connection and answered within 3 seconds.
 - Required scopes:
-  - `im:message` — receive `im.message.receive_v1` events and reply in a message thread.
+  - `im:message` — reply to messages and manage message resources.
+  - `im:message.p2p_msg:readonly` — receive direct-message `im.message.receive_v1` events.
+  - `im:message.group_at_msg:readonly` — receive `im.message.receive_v1` events when the app is mentioned in a group.
   - `im:message:send_as_bot` — send proactive messages to a principal `open_id` (only used when `FEISHU_CLAIM_PRINCIPAL_DELIVERIES=1`).
   - `im:resource` — upload and download image/file message resources (30 MB ceiling).
   - `im:chat:readonly` — used only for the startup connectivity probe (`chat.list`).
@@ -48,7 +50,9 @@ CORE_SIGNING_SECRET=replace-with-at-least-32-characters \
 npm run setup
 ```
 
-By default, setup opens the official Feishu/Lark device-authorization flow to create an application. It requests only the scopes, event, and callback listed above, then uses the official application v7 API to select WebSocket delivery for both events and callbacks. If the Bot Info response does not contain a tenant key, setup waits for a real `im.message.receive_v1` event; send the bot a test message to prove that long-connection delivery works. Only after credential, bot identity, and tenant verification succeed does setup atomically write the six required runtime variables to `.env` with mode `0600`.
+By default, setup opens the official Feishu/Lark device-authorization flow to create an application. It requests only the scopes, event, and callback listed above, then uses the official application v7 API to select WebSocket delivery for both events and callbacks. If the Bot Info response does not contain a tenant key, setup waits for a real `im.message.receive_v1` event; send the bot a test message to prove that long-connection delivery works. Only after credential, bot identity, and tenant verification succeed does setup atomically write the seven required runtime variables to `.env` with mode `0600`.
+
+Setup persists `FEISHU_BRAND=feishu|lark`; runtime uses it for both OpenAPI requests and the long connection. Existing Feishu deployments may omit it because `feishu` is the default. Lark deployments must set it to `lark`.
 
 To configure an existing application, set `FEISHU_APP_ID` and `FEISHU_APP_SECRET`; use `--brand lark` when targeting Lark. Environment variables are the recommended way to pass secrets because command-line arguments may be visible in shell history and process listings. `--env-file <path>` selects another output file. `--no-open-platform-auto` requires an existing App ID and secret, skips all Open Platform mutation, and leaves the scopes, event, callback, and WebSocket mode as an explicit manual prerequisite. Run `npm run setup -- --help` for the complete option list. Secret values are never printed.
 

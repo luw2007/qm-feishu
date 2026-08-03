@@ -198,6 +198,31 @@ function fakeApiClient(overrides: Partial<FeishuApiClient['im']['v1']>): FeishuA
   } as FeishuApiClient;
 }
 
+test('FeishuSdkClient disables vendor logging before constructing the SDK client', () => {
+  let sdkOptions: Record<string, unknown> | undefined;
+  let consoleCalls = 0;
+  const originalConsoleError = console.error;
+  console.error = () => {
+    consoleCalls += 1;
+  };
+  try {
+    new FeishuSdkClient({
+      appId: 'cli_test_1',
+      appSecret: 'secret_test_1',
+      createClient: (options: Record<string, unknown>) => {
+        sdkOptions = options;
+        return fakeApiClient({});
+      },
+    });
+    const logger = sdkOptions?.logger as { error?: (...values: unknown[]) => void } | undefined;
+    assert.equal(typeof logger?.error, 'function');
+    logger?.error?.('Bearer secret_test_1');
+    assert.equal(consoleCalls, 0);
+  } finally {
+    console.error = originalConsoleError;
+  }
+});
+
 test('FeishuSdkClient.reply: posts through message.reply and decodes the receipt', async () => {
   let captured: unknown;
   const client = new FeishuSdkClient({

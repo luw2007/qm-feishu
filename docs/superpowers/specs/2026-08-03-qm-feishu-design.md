@@ -174,7 +174,7 @@ The surface module calls only injected ports. It does not call `fetch` or import
 
 ```ts
 interface QmPort {
-  submitTurn(input: SurfaceTurn): Promise<QueuedRun>;
+  submitTurn(input: SurfaceTurn): Promise<QueuedRun | { replayed: true }>;
   getRun(runId: string): Promise<RunView>;
   activeRun(threadRef: string): Promise<string | undefined>;
   signalRun(runId: string, signal: { kind: "abort" | "steer"; text?: string }): Promise<void>;

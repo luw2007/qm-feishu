@@ -432,6 +432,20 @@ test('handleCardAction waits for durable QM continuation acceptance and returns 
   });
 });
 
+test('handleCardAction treats a completed QM idempotency replay as success without inventing watcher context', async () => {
+  const result = await handleCardAction(actionFixture(), {
+    qm: fakeQm({
+      getApproval: async () => approvalFixture(),
+      submitTurn: async () => ({ replayed: true }),
+    }),
+  });
+
+  assert.deepEqual(result, {
+    response: { toast: { type: 'success', content: 'Approved.' } },
+    outcome: { kind: 'accepted', requestId: 'req_test_1', scope: 'once' },
+  });
+});
+
 test('handleCardAction deadline returns an error immediately but exposes a controlled late queued continuation', async () => {
   const queued = deferred<{ runId: string; queued: true }>();
   const timeoutResult = await handleCardAction(

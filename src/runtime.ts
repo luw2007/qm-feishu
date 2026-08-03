@@ -9,6 +9,7 @@ import type { ApprovalView, NormalizedCardAction, NormalizedFeishuMessage, Outgo
 import { QmHttpClient } from './qm/client.js';
 import { FeishuSdkClient } from './feishu/client.js';
 import { FeishuSdkEventSource } from './feishu/events.js';
+import { feishuOpenApiHost } from './setup/feishu-api.js';
 import { decodeCardAction, renderApprovalCard as defaultRenderApprovalCard } from './feishu/cards.js';
 import { decodeReceivedMessage } from './feishu/messages.js';
 import { handleIncomingMessage } from './surface/intake.js';
@@ -57,11 +58,22 @@ function defaultCreateQmClient(config: ResolvedFeishuSurfaceConfig): QmPort {
 }
 
 function defaultCreateFeishuClient(config: ResolvedFeishuSurfaceConfig): FeishuPort {
-  return new FeishuSdkClient({ appId: config.feishuAppId, appSecret: config.feishuAppSecret });
+  return new FeishuSdkClient({
+    appId: config.feishuAppId,
+    appSecret: config.feishuAppSecret,
+    domain: feishuOpenApiHost(config.feishuBrand),
+  });
 }
 
-function defaultCreateEventSource(config: ResolvedFeishuSurfaceConfig): FeishuEventSource {
-  return new FeishuSdkEventSource({ appId: config.feishuAppId, appSecret: config.feishuAppSecret });
+function defaultCreateEventSource(config: ResolvedFeishuSurfaceConfig, log: Logger): FeishuEventSource {
+  return new FeishuSdkEventSource({
+    appId: config.feishuAppId,
+    appSecret: config.feishuAppSecret,
+    domain: feishuOpenApiHost(config.feishuBrand),
+    onEventType: (eventType) => {
+      log({ event: 'ws_event_received', level: 'debug', eventType });
+    },
+  });
 }
 
 function instrumentDeliveryQm(qm: QmPort, log: Logger, metrics: RuntimeMetrics): QmPort {
@@ -130,7 +142,7 @@ export async function runFeishuSurface(config: FeishuSurfaceConfig, deps: Runtim
   };
   const qm = (deps.createQmClient ?? defaultCreateQmClient)(resolved);
   const feishu = (deps.createFeishuClient ?? defaultCreateFeishuClient)(resolved);
-  const eventSource = (deps.createEventSource ?? defaultCreateEventSource)(resolved);
+  const eventSource = deps.createEventSource?.(resolved) ?? defaultCreateEventSource(resolved, log);
   const health = await (deps.createHealthServer ?? startHealthServer)({
     host: resolved.healthHost,
     port: resolved.healthPort,

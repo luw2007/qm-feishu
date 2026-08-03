@@ -308,6 +308,26 @@ test('handleIncomingMessage: duplicate message_id values reuse the same idempote
   assert.equal(qm.calls.submitTurn[1]!.idempotencyKey, 'feishu:message:om_test_dup_1');
 });
 
+test('handleIncomingMessage: a completed QM idempotency replay is ignored without duplicate side effects', async () => {
+  const qm = fakeQm({
+    submitTurn: async (input) => {
+      qm.calls.submitTurn.push(input);
+      qm.order.push('submitTurn');
+      return { replayed: true };
+    },
+  });
+  const feishu = fakeFeishu(qm.order);
+
+  const outcome = await handleIncomingMessage(baseMessage({ messageId: 'om_test_dup_2' }), { qm: qm.port, feishu: feishu.port }, {
+    botOpenId: BOT_OPEN_ID,
+    tenantKey: TENANT_KEY,
+  });
+
+  assert.deepEqual(outcome, { kind: 'ignored', reason: 'duplicate' });
+  assert.equal(feishu.calls.reply.length, 0);
+  assert.equal(qm.calls.ingestSurfaceEvents.length, 0);
+});
+
 test('handleIncomingMessage: an explicit stop input signals the active run and posts one sanitized terminal notice', async () => {
   const qm = fakeQm({ activeRunResult: 'run_active_1' });
   const feishu = fakeFeishu(qm.order);

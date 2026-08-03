@@ -11,7 +11,7 @@ import type {
   MessageReceipt,
   OutgoingFile,
   OutgoingMessage,
-  QueuedRun,
+  TurnSubmission,
   RunView,
   SurfaceEvent,
   SurfaceTurn,
@@ -19,7 +19,7 @@ import type {
 
 export interface QmPort {
   probe(): Promise<void>;
-  submitTurn(input: SurfaceTurn): Promise<QueuedRun>;
+  submitTurn(input: SurfaceTurn): Promise<TurnSubmission>;
   getRun(runId: string): Promise<RunView>;
   activeRun(threadRef: string): Promise<string | undefined>;
   signalRun(runId: string, signal: { kind: 'abort' | 'steer'; text?: string }): Promise<void>;

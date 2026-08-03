@@ -87,6 +87,8 @@ approval action: feishu:approval:<request_id>:<action>:<event_id>
 outbound part: hash(<qm delivery key>, <part index>, <part kind>) truncated to <= 50 chars
 ```
 
+QM `7f2c916` returns an already-completed idempotency replay as `{ status: "ok", ... }` rather than a queued run. `QmPort.submitTurn` maps that narrow wire response to `{ replayed: true }`; surface handlers suppress duplicate acknowledgements, cache publication, and approval watchers instead of inventing a run ID.
+
 ### Error ownership
 
 - transport modules classify external errors;

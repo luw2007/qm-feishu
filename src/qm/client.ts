@@ -8,7 +8,7 @@ import type {
   DeliveryReceipt,
   DirectoryBatch,
   IncomingFile,
-  QueuedRun,
+  TurnSubmission,
   RunView,
   SurfaceEvent,
   SurfaceTurn,
@@ -211,7 +211,7 @@ export class QmHttpClient implements QmPort {
     decodeOk(await this.#json('GET', '/healthz'));
   }
 
-  async submitTurn(input: SurfaceTurn): Promise<QueuedRun> {
+  async submitTurn(input: SurfaceTurn): Promise<TurnSubmission> {
     const body = {
       text: input.text,
       actor: input.actor,

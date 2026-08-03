@@ -11,6 +11,7 @@ export const MANAGED_KEYS = [
   'FEISHU_APP_SECRET',
   'FEISHU_BOT_OPEN_ID',
   'FEISHU_TENANT_KEY',
+  'FEISHU_BRAND',
 ] as const;
 
 export type ManagedKey = (typeof MANAGED_KEYS)[number];

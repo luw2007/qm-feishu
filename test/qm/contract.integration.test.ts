@@ -44,8 +44,40 @@ test(`QM source-auth contract at revision ${QM_REVISION}`, { skip: skipReason },
       triggerTs: Date.now(),
       displayText: 'contract turn',
     });
+    assert.equal('replayed' in queued, false);
+    if ('replayed' in queued) return;
     assert.ok(queued.runId);
     assert.equal((await client.getRun(queued.runId)).runId, queued.runId);
+  });
+
+  await t.test('completed idempotency replay maps to a duplicate outcome', async () => {
+    const now = Date.now();
+    const turn = {
+      text: 'qm-feishu duplicate contract turn',
+      actor: { externalId: 'ou_test_contract_duplicate' },
+      conversation: { id: 'oc_test_contract_duplicate', kind: 'dm' as const },
+      threadRef: `feishu:dm:oc_test_contract_duplicate_${now}`,
+      destination: 'user:ou_test_contract_duplicate',
+      surface: 'feishu' as const,
+      addressed: true as const,
+      surfaceTools: false as const,
+      idempotencyKey: `qm-feishu-duplicate-${now}`,
+      origin: { kind: 'human' as const, messageTs: String(now) },
+      triggerTs: now,
+      displayText: 'duplicate contract turn',
+    };
+    const firstClient = new QmHttpClient({ baseUrl, signingSecret, now: () => now });
+    const replayClient = new QmHttpClient({ baseUrl, signingSecret, now: () => now + 1_000 });
+    const first = await firstClient.submitTurn(turn);
+    assert.equal('replayed' in first, false);
+    if ('replayed' in first) return;
+    let status = (await client.getRun(first.runId)).status;
+    for (let attempt = 0; attempt < 1_000 && status === 'queued'; attempt += 1) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      status = (await client.getRun(first.runId)).status;
+    }
+    assert.equal(status, 'completed');
+    assert.deepEqual(await replayClient.submitTurn(turn), { replayed: true });
   });
 
   await t.test('delivery claim route is source authenticated', async () => {

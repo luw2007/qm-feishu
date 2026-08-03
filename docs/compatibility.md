@@ -17,6 +17,8 @@ Required Feishu capabilities:
 - `im.message.receive_v1` long-connection event;
 - `card.action.trigger` callback;
 - `im:message`;
+- `im:message.p2p_msg:readonly` for direct-message events;
+- `im:message.group_at_msg:readonly` for group mention events;
 - `im:message:send_as_bot` when principal delivery is enabled;
 - `im:resource`;
 - `im:chat:readonly` for the connectivity probe.

@@ -104,7 +104,7 @@ export async function runSetup(args: SetupArgs, dependencies: SetupDependencies)
     appId: registered.appId,
     appSecret: registered.appSecret,
   });
-  if (args.openPlatformAuto) {
+  if (explicitCredentials && args.openPlatformAuto) {
     await api.configureApplication(registered.appId, token.tenantAccessToken);
   }
   const bot = await api.probeBotInfo(token.tenantAccessToken);
@@ -142,6 +142,7 @@ export async function runSetup(args: SetupArgs, dependencies: SetupDependencies)
     FEISHU_APP_SECRET: registered.appSecret,
     FEISHU_BOT_OPEN_ID: bot.openId,
     FEISHU_TENANT_KEY: tenantKey,
+    FEISHU_BRAND: brand,
   });
   dependencies.writeLine(`Setup complete. Runtime configuration written to ${path.relative(dependencies.cwd, envFile) || '.env'}.`);
   return { envFile, brand };

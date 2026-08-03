@@ -70,6 +70,31 @@ test('FeishuSdkEventSource.start: registers card actions on the WebSocket dispat
   });
 });
 
+test('FeishuSdkEventSource.start: reports the raw event type before dispatcher invocation', async () => {
+  const observed: string[] = [];
+  const invoked: unknown[] = [];
+  const dispatcher = {
+    register: () => undefined,
+    invoke: async (data: unknown) => {
+      invoked.push(data);
+      return { code: 200 };
+    },
+  };
+  const source = new FeishuSdkEventSource({
+    appId: 'cli_test_1',
+    appSecret: 'secret_test_1',
+    onEventType: (eventType) => observed.push(eventType),
+    createEventDispatcher: () => dispatcher,
+    createWsClient: () => ({ start: async () => {}, close: () => {} }),
+  });
+
+  await source.start({ onMessage: async () => {}, onCardAction: async () => undefined });
+  const payload = { header: { event_type: 'im.message.receive_v1' }, event: { text: 'must-not-be-observed' } };
+  assert.deepEqual(await dispatcher.invoke(payload), { code: 200 });
+  assert.deepEqual(observed, ['im.message.receive_v1']);
+  assert.deepEqual(invoked, [payload]);
+});
+
 test('FeishuSdkEventSource.stop: closes the underlying ws client', async () => {
   let closedWith: unknown;
 
@@ -88,6 +113,40 @@ test('FeishuSdkEventSource.stop: closes the underlying ws client', async () => {
   await source.start({ onMessage: async () => {}, onCardAction: async () => undefined });
   await source.stop();
   assert.deepEqual(closedWith, { force: true });
+});
+
+test('FeishuSdkEventSource disables vendor logging for both dispatcher and WebSocket clients', async () => {
+  let dispatcherOptions: Record<string, unknown> | undefined;
+  let wsOptions: Record<string, unknown> | undefined;
+  let consoleCalls = 0;
+  const originalConsoleError = console.error;
+  console.error = () => {
+    consoleCalls += 1;
+  };
+  try {
+    const source = new FeishuSdkEventSource({
+      appId: 'cli_test_1',
+      appSecret: 'secret_test_1',
+      createEventDispatcher: (options) => {
+        dispatcherOptions = options;
+        return { register: () => undefined };
+      },
+      createWsClient: (options) => {
+        wsOptions = options;
+        return { start: async () => undefined, close: () => undefined };
+      },
+    });
+    await source.start({ onMessage: async () => undefined, onCardAction: async () => undefined });
+    const dispatcherLogger = dispatcherOptions?.logger as { error?: (...values: unknown[]) => void } | undefined;
+    const wsLogger = wsOptions?.logger as { error?: (...values: unknown[]) => void } | undefined;
+    assert.equal(typeof dispatcherLogger?.error, 'function');
+    assert.equal(typeof wsLogger?.error, 'function');
+    dispatcherLogger?.error?.('Bearer secret_test_1');
+    wsLogger?.error?.('Bearer secret_test_1');
+    assert.equal(consoleCalls, 0);
+  } finally {
+    console.error = originalConsoleError;
+  }
 });
 
 

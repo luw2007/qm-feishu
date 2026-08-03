@@ -5,6 +5,7 @@ import type { FeishuPort } from '../ports.js';
 import type { FeishuResourceKey, FeishuTarget, IncomingResource, MessageReceipt, OutgoingFile, OutgoingMessage } from '../types.js';
 import { assertUploadable, feishuFileType, toWebStream } from './files.js';
 import { decodeMessageReceipt, outgoingPayload } from './messages.js';
+import { silentFeishuSdkLogger, type FeishuSdkLogger } from './sdk-logger.js';
 
 export abstract class FeishuRequestError extends Error {
   readonly status: number;
@@ -147,6 +148,12 @@ export type FeishuSdkClientOptions = {
   appSecret: string;
   domain?: string;
   client?: FeishuApiClient;
+  createClient?: (options: {
+    appId: string;
+    appSecret: string;
+    domain?: string;
+    logger: FeishuSdkLogger;
+  }) => FeishuApiClient;
 };
 
 export class FeishuSdkClient implements FeishuPort {
@@ -155,13 +162,12 @@ export class FeishuSdkClient implements FeishuPort {
   constructor(options: FeishuSdkClientOptions) {
     if (!options.appId) throw new TypeError('Feishu app ID is required');
     if (!options.appSecret) throw new TypeError('Feishu app secret is required');
-    this.#client =
-      options.client ??
-      (new Client({
-        appId: options.appId,
-        appSecret: options.appSecret,
-        ...(options.domain !== undefined ? { domain: options.domain } : {}),
-      }) as unknown as FeishuApiClient);
+    this.#client = options.client ?? (options.createClient ?? ((params) => new Client(params) as unknown as FeishuApiClient))({
+      appId: options.appId,
+      appSecret: options.appSecret,
+      ...(options.domain !== undefined ? { domain: options.domain } : {}),
+      logger: silentFeishuSdkLogger,
+    });
   }
 
   async #call<T>(fn: () => Promise<T>): Promise<T> {

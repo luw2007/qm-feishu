@@ -253,6 +253,7 @@ export async function handleCardAction(
     try {
       const queued = await withinDeadline(submission, deadlineAt);
       if (queued.kind === 'value') {
+        if ('replayed' in queued.value) return { response: toastFor(outcome), outcome };
         return {
           response: toastFor(outcome),
           outcome,
@@ -262,11 +263,14 @@ export async function handleCardAction(
 
       const failed: ApprovalActionOutcome = { kind: 'failed', requestId: action.requestId };
       const lateContinuation = submission.then(
-        (lateQueued): ApprovalContinuation => ({
-          runId: lateQueued.runId,
-          threadRef: conversation.threadRef,
-          destination,
-        }),
+        (lateQueued): ApprovalContinuation | undefined =>
+          'replayed' in lateQueued
+            ? undefined
+            : {
+                runId: lateQueued.runId,
+                threadRef: conversation.threadRef,
+                destination,
+              },
         (error: unknown) => {
           log({
             event: 'approval_continuation_late_failed',

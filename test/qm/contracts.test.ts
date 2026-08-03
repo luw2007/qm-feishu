@@ -31,6 +31,11 @@ test('contract decoders map current QM responses into the public port types', ()
     steered: true,
   });
   assert.deepEqual(
+    decodeQueuedRun({ status: 'ok', sessionId: 'session_test_1', sourceUserSeq: 4, sourceAssistantEntrySeq: 5, reply: 'done' }),
+    { replayed: true },
+  );
+  assert.deepEqual(decodeQueuedRun({ status: 'silent', sessionId: 'session_test_1' }), { replayed: true });
+  assert.deepEqual(
     decodeRunView('run_test_1', { status: 'done', result: { status: 'ok' }, startedAt: 1, finishedAt: 2 }),
     { runId: 'run_test_1', status: 'completed' },
   );
@@ -125,9 +130,18 @@ test('approval decoder preserves the authoritative QM continuation context witho
   );
 });
 
+test('approval decoder treats omitted grant modes as the QM defaults', () => {
+  assert.deepEqual(decodeApproval({ requestId: 'approval_test_1' }).grantModes, {
+    once: true,
+    session: true,
+    always: true,
+  });
+});
+
 test('malformed successful contract bodies fail loudly', () => {
   for (const decode of [
     () => decodeQueuedRun({ status: 'queued' }),
+    () => decodeQueuedRun({ status: 'silent' }),
     () => decodeRunView('run_test_1', { status: 'mystery' }),
     () => decodeBlobRef({ blobId: '', sizeBytes: -1 }),
     () => decodeDeliveries({ deliveries: [{ id: 'delivery_test_1' }] }),

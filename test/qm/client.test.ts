@@ -239,6 +239,28 @@ test('HTTP failures have typed, retry-aware, secret-safe errors', async () => {
   }
 });
 
+test('submitTurn maps QM completed idempotency replays without inventing a run ID', async () => {
+  const client = new QmHttpClient({
+    baseUrl: 'http://qm.test',
+    signingSecret: 'contract-secret',
+    fetch: recordingFetch([
+      json({ status: 'ok', sessionId: 'session_test_1', sourceUserSeq: 4, sourceAssistantEntrySeq: 5, reply: 'done' }),
+    ], []),
+  });
+
+  assert.deepEqual(await client.submitTurn(turn()), { replayed: true });
+});
+
+test('submitTurn maps QM silent idempotency replays without inventing a run ID', async () => {
+  const client = new QmHttpClient({
+    baseUrl: 'http://qm.test',
+    signingSecret: 'contract-secret',
+    fetch: recordingFetch([json({ status: 'silent', sessionId: 'session_test_1' })], []),
+  });
+
+  assert.deepEqual(await client.submitTurn(turn()), { replayed: true });
+});
+
 test('malformed 2xx, network failures, and local timeouts are distinct', async () => {
   const malformed = new QmHttpClient({
     baseUrl: 'http://qm.test',

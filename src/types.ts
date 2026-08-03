@@ -58,6 +58,8 @@ export type QueuedRun = {
   steered?: boolean;
 };
 
+export type TurnSubmission = QueuedRun | { replayed: true };
+
 export type RunView = {
   runId: string;
   status: 'queued' | 'running' | 'completed' | 'failed' | 'aborted';

@@ -210,7 +210,14 @@ export type FeishuSetupManifest = {
 };
 
 export const FEISHU_SETUP_MANIFEST: FeishuSetupManifest = {
-  scopes: ['im:message', 'im:message:send_as_bot', 'im:resource', 'im:chat:readonly'],
+  scopes: [
+    'im:message',
+    'im:message.p2p_msg:readonly',
+    'im:message.group_at_msg:readonly',
+    'im:message:send_as_bot',
+    'im:resource',
+    'im:chat:readonly',
+  ],
   event: 'im.message.receive_v1',
   callback: 'card.action.trigger',
   mode: 'long-connection',

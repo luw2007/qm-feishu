@@ -88,6 +88,13 @@ void test('resolveConfig rejects an invalid logLevel', () => {
   );
 });
 
+void test('resolveConfig rejects an invalid Feishu brand', () => {
+  assert.throws(
+    () => resolveConfig(validConfig({ feishuBrand: 'global' as 'feishu' | 'lark' })),
+    /FEISHU_BRAND must be feishu or lark/,
+  );
+});
+
 void test('configFromEnv reads every documented environment variable', () => {
   const config = configFromEnv({
     CORE_API_URL: 'http://127.0.0.1:18080',
@@ -96,6 +103,7 @@ void test('configFromEnv reads every documented environment variable', () => {
     FEISHU_APP_SECRET: 'secret_test',
     FEISHU_BOT_OPEN_ID: 'ou_test_bot_1',
     FEISHU_TENANT_KEY: 'tenant_test_1',
+    FEISHU_BRAND: 'lark',
     FEISHU_CLAIM_PRINCIPAL_DELIVERIES: '1',
     FEISHU_DELIVERY_CLAIM_MS: '45000',
     FEISHU_DELIVERY_POLL_MS: '2000',
@@ -114,6 +122,7 @@ void test('configFromEnv reads every documented environment variable', () => {
     feishuAppSecret: 'secret_test',
     feishuBotOpenId: 'ou_test_bot_1',
     feishuTenantKey: 'tenant_test_1',
+    feishuBrand: 'lark',
     claimPrincipalDeliveries: true,
     deliveryClaimMs: 45_000,
     deliveryPollMs: 2_000,
@@ -137,6 +146,7 @@ void test('configFromEnv falls back to documented defaults when optional variabl
   } as unknown as NodeJS.ProcessEnv);
 
   const resolved = resolveConfig(config);
+  assert.equal(resolved.feishuBrand, 'feishu');
   assert.equal(resolved.claimPrincipalDeliveries, false);
   assert.equal(resolved.deliveryClaimMs, 30_000);
   assert.equal(resolved.healthHost, '127.0.0.1');
