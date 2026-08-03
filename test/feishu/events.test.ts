@@ -90,6 +90,53 @@ test('FeishuSdkEventSource.stop: closes the underlying ws client', async () => {
   assert.deepEqual(closedWith, { force: true });
 });
 
+
+test('FeishuSdkEventSource.start: optionally waits for a confirmed connection', async () => {
+  let ready: (() => void) | undefined;
+  const source = new FeishuSdkEventSource({
+    appId: 'cli_test_1',
+    appSecret: 'secret_test_1',
+    awaitReady: true,
+    createEventDispatcher: () => ({ register: () => undefined }),
+    createWsClient: (options) => {
+      ready = () => options.onReady?.();
+      return { start: async () => undefined, close: () => undefined };
+    },
+  });
+
+  let settled = false;
+  const started = source.start({ onMessage: async () => undefined, onCardAction: async () => undefined }).then(() => {
+    settled = true;
+  });
+  await Promise.resolve();
+  assert.equal(settled, false);
+  assert.ok(ready !== undefined);
+  ready();
+  await started;
+  assert.equal(settled, true);
+});
+
+test('FeishuSdkEventSource.start: rejects a confirmed connection error without leaking SDK details', async () => {
+  const source = new FeishuSdkEventSource({
+    appId: 'cli_test_1',
+    appSecret: 'secret_test_1',
+    awaitReady: true,
+    createEventDispatcher: () => ({ register: () => undefined }),
+    createWsClient: (options) => ({
+      start: async () => {
+        assert.ok(options.onError !== undefined);
+        options.onError(new Error('secret_test_1'));
+      },
+      close: () => undefined,
+    }),
+  });
+
+  await assert.rejects(
+    source.start({ onMessage: async () => undefined, onCardAction: async () => undefined }),
+    /Feishu long connection failed/,
+  );
+});
+
 test('FeishuSdkEventSource: rejects a missing appId or appSecret', () => {
   assert.throws(() => new FeishuSdkEventSource({ appId: '', appSecret: 'secret_test_1' }), TypeError);
   assert.throws(() => new FeishuSdkEventSource({ appId: 'cli_test_1', appSecret: '' }), TypeError);

@@ -21,6 +21,7 @@
   ],
   "scripts": {
     "start": "node dist/main.js",
+    "setup": "node dist/setup-main.js",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

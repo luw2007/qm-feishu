@@ -37,6 +37,21 @@ Create a Feishu/Lark application with these capabilities:
 
 Use a dedicated non-production tenant and test users for development; never point a development deployment at a production tenant.
 
+### Setup command
+
+Build the adapter, then run the setup command from the repository root:
+
+```sh
+npm run build
+CORE_API_URL=http://127.0.0.1:18080 \
+CORE_SIGNING_SECRET=replace-with-at-least-32-characters \
+npm run setup
+```
+
+By default, setup opens the official Feishu/Lark device-authorization flow to create an application. It requests only the scopes, event, and callback listed above, then uses the official application v7 API to select WebSocket delivery for both events and callbacks. If the Bot Info response does not contain a tenant key, setup waits for a real `im.message.receive_v1` event; send the bot a test message to prove that long-connection delivery works. Only after credential, bot identity, and tenant verification succeed does setup atomically write the six required runtime variables to `.env` with mode `0600`.
+
+To configure an existing application, set `FEISHU_APP_ID` and `FEISHU_APP_SECRET`; use `--brand lark` when targeting Lark. Environment variables are the recommended way to pass secrets because command-line arguments may be visible in shell history and process listings. `--env-file <path>` selects another output file. `--no-open-platform-auto` requires an existing App ID and secret, skips all Open Platform mutation, and leaves the scopes, event, callback, and WebSocket mode as an explicit manual prerequisite. Run `npm run setup -- --help` for the complete option list. Secret values are never printed.
+
 ## Configuration
 
 Required environment variables:
