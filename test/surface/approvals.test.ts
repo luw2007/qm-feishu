@@ -16,17 +16,26 @@ import {
   handleCardAction,
   watchApproval,
 } from '../../src/surface/approvals.js';
+import {
+  FeishuContractError,
+  FeishuPermanentError,
+  FeishuRateLimitedError,
+  FeishuTransientError,
+  FeishuUnavailableError,
+} from '../../src/feishu/client.js';
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void; reject: (error: Error) => void } {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => {
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((res, rej) => {
     resolve = res;
+    reject = rej;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 function notImplemented(name: string): () => never {
@@ -250,28 +259,225 @@ test('watchApproval stops polling once the run reaches a terminal state without 
   assert.equal(sendCalls, 0);
 });
 
-// --- handleCardAction: callback response precedes QM continuation -------
+test('watchApproval emits one sanitized terminal notice for failed and aborted accepted runs', async () => {
+  for (const status of ['failed', 'aborted'] as const) {
+    const sent: OutgoingMessage[] = [];
+    const qm = fakeQm({
+      pendingApproval: async () => null,
+      getRun: async () => ({ runId: 'run_sensitive_1', status }),
+    });
+    const feishu = fakeFeishu({
+      send: async (_target, message) => {
+        sent.push(message);
+        return { messageId: 'om_test_terminal_1' };
+      },
+    });
 
-test('handleCardAction returns its response before the QM continuation settles', async () => {
-  const gate = deferred<{ runId: string; queued: true }>();
-  let submitTurnCalled = false;
+    const outcome = await watchApproval(
+      { runId: 'run_sensitive_1', threadRef: 'feishu:dm:oc_test_dm_1', destination: 'chat:oc_test_dm_1:message:om_test_1' },
+      { qm, feishu },
+      { renderCard: renderApprovalCard },
+    );
+
+    const expectedText = status === 'failed' ? 'The run failed.' : 'The run was stopped.';
+    assert.deepEqual(outcome, { kind: 'terminal', status });
+    assert.deepEqual(sent, [{
+      kind: 'text',
+      text: expectedText,
+      uuid: `terminal:${status}:run_sensitive_1`,
+    }]);
+    assert.doesNotMatch(expectedText, /sensitive/);
+  }
+});
+
+test('watchApproval checks authoritative pending approval before terminal state for collect-mode runs', async () => {
+  const order: string[] = [];
+  let sendCalls = 0;
   const qm = fakeQm({
-    getApproval: async () => approvalFixture(),
-    submitTurn: async (turn) => {
-      submitTurnCalled = true;
-      void turn;
-      return gate.promise;
+    pendingApproval: async () => {
+      order.push('pendingApproval');
+      return approvalFixture();
+    },
+    getRun: async () => {
+      order.push('getRun');
+      return { runId: 'run_test_1', status: 'completed' };
+    },
+  });
+  const feishu = fakeFeishu({
+    send: async () => {
+      sendCalls += 1;
+      return { messageId: 'om_test_card_1' };
     },
   });
 
-  const result = await Promise.race([
-    handleCardAction(actionFixture(), { qm }),
-    delay(50).then(() => 'timed_out' as const),
-  ]);
+  const outcome = await watchApproval(
+    { runId: 'run_test_1', threadRef: 'feishu:dm:oc_test_dm_1', destination: 'chat:oc_test_dm_1:message:om_test_1' },
+    { qm, feishu },
+    { renderCard: renderApprovalCard },
+  );
 
-  assert.notEqual(result, 'timed_out');
-  assert.equal(submitTurnCalled, true);
-  gate.resolve({ runId: 'run_test_1', queued: true });
+  assert.deepEqual(outcome, { kind: 'card_sent', requestId: 'req_test_1' });
+  assert.deepEqual(order, ['pendingApproval']);
+  assert.equal(sendCalls, 1);
+});
+
+test('watchApproval retries transient Feishu sends but never retries permanent or contract failures', async () => {
+  for (const transientError of [
+    new FeishuRateLimitedError(429),
+    new FeishuTransientError(503),
+    new FeishuUnavailableError(),
+  ]) {
+    let sendCalls = 0;
+    const qm = fakeQm({ pendingApproval: async () => approvalFixture() });
+    const feishu = fakeFeishu({
+      send: async () => {
+        sendCalls += 1;
+        if (sendCalls === 1) throw transientError;
+        return { messageId: 'om_test_card_1' };
+      },
+    });
+
+    assert.deepEqual(
+      await watchApproval(
+        { runId: 'run_test_1', threadRef: 'feishu:dm:oc_test_dm_1', destination: 'chat:oc_test_dm_1:message:om_test_1' },
+        { qm, feishu },
+        { renderCard: renderApprovalCard, pollIntervalMs: 1 },
+      ),
+      { kind: 'card_sent', requestId: 'req_test_1' },
+    );
+    assert.equal(sendCalls, 2);
+  }
+
+  for (const terminalError of [new FeishuPermanentError(400), new FeishuContractError('bad receipt')]) {
+    let sendCalls = 0;
+    const qm = fakeQm({ pendingApproval: async () => approvalFixture() });
+    const feishu = fakeFeishu({
+      send: async () => {
+        sendCalls += 1;
+        throw terminalError;
+      },
+    });
+    await assert.rejects(
+      watchApproval(
+        { runId: 'run_test_1', threadRef: 'feishu:dm:oc_test_dm_1', destination: 'chat:oc_test_dm_1:message:om_test_1' },
+        { qm, feishu },
+        { renderCard: renderApprovalCard, pollIntervalMs: 1 },
+      ),
+      terminalError.constructor,
+    );
+    assert.equal(sendCalls, 1);
+  }
+});
+
+test('watchApproval retries structurally transient QM failures but fails immediately on permanent failures', async () => {
+  let transientCalls = 0;
+  const transientQm = fakeQm({
+    pendingApproval: async () => {
+      transientCalls += 1;
+      if (transientCalls === 1) throw Object.assign(new Error('QM unavailable'), { disposition: 'transient' as const });
+      return approvalFixture();
+    },
+  });
+  const feishu = fakeFeishu({ send: async () => ({ messageId: 'om_test_card_1' }) });
+
+  assert.deepEqual(
+    await watchApproval(
+      { runId: 'run_test_1', threadRef: 'feishu:dm:oc_test_dm_1', destination: 'chat:oc_test_dm_1:message:om_test_1' },
+      { qm: transientQm, feishu },
+      { renderCard: renderApprovalCard, pollIntervalMs: 1 },
+    ),
+    { kind: 'card_sent', requestId: 'req_test_1' },
+  );
+  assert.equal(transientCalls, 2);
+
+  let permanentCalls = 0;
+  const permanentQm = fakeQm({
+    pendingApproval: async () => {
+      permanentCalls += 1;
+      throw Object.assign(new Error('QM rejected'), { disposition: 'permanent' as const });
+    },
+  });
+  await assert.rejects(
+    watchApproval(
+      { runId: 'run_test_1', threadRef: 'feishu:dm:oc_test_dm_1', destination: 'chat:oc_test_dm_1:message:om_test_1' },
+      { qm: permanentQm, feishu },
+      { renderCard: renderApprovalCard, pollIntervalMs: 1 },
+    ),
+    { disposition: 'permanent' },
+  );
+  assert.equal(permanentCalls, 1);
+});
+
+// --- handleCardAction: callback waits only for durable queue acceptance --
+
+test('handleCardAction waits for durable QM continuation acceptance and returns watcher context', async () => {
+  const gate = deferred<{ runId: string; queued: true }>();
+  const qm = fakeQm({
+    getApproval: async () => approvalFixture(),
+    submitTurn: async () => gate.promise,
+  });
+
+  const result = handleCardAction(actionFixture(), { qm }, { deadlineMs: 100 });
+  assert.equal(await Promise.race([result.then(() => 'settled'), delay(10).then(() => 'pending')]), 'pending');
+
+  gate.resolve({ runId: 'run_continuation_1', queued: true });
+  assert.deepEqual(await result, {
+    response: { toast: { type: 'success', content: 'Approved.' } },
+    outcome: { kind: 'accepted', requestId: 'req_test_1', scope: 'once' },
+    continuation: {
+      runId: 'run_continuation_1',
+      threadRef: 'feishu:dm:oc_test_dm_1',
+      destination: 'chat:oc_test_dm_1:message:om_test_1',
+    },
+  });
+});
+
+test('handleCardAction deadline returns an error immediately but exposes a controlled late queued continuation', async () => {
+  const queued = deferred<{ runId: string; queued: true }>();
+  const timeoutResult = await handleCardAction(
+    actionFixture(),
+    { qm: fakeQm({ getApproval: async () => approvalFixture(), submitTurn: async () => queued.promise }) },
+    { deadlineMs: 5 },
+  );
+  assert.equal(timeoutResult.response.toast.type, 'error');
+  assert.equal(timeoutResult.outcome.kind, 'failed');
+  assert.equal(timeoutResult.continuation, undefined);
+  assert.ok(timeoutResult.lateContinuation);
+
+  queued.resolve({ runId: 'run_late_1', queued: true });
+  assert.deepEqual(await timeoutResult.lateContinuation, {
+    runId: 'run_late_1',
+    threadRef: 'feishu:dm:oc_test_dm_1',
+    destination: 'chat:oc_test_dm_1:message:om_test_1',
+  });
+});
+
+test('handleCardAction consumes a late submit rejection without claiming success', async () => {
+  const queued = deferred<{ runId: string; queued: true }>();
+  const events: Record<string, unknown>[] = [];
+  const timeoutResult = await handleCardAction(
+    actionFixture(),
+    { qm: fakeQm({ getApproval: async () => approvalFixture(), submitTurn: async () => queued.promise }) },
+    { deadlineMs: 5, log: (event) => events.push(event) },
+  );
+
+  queued.reject(new Error('sensitive late failure'));
+  assert.equal(await timeoutResult.lateContinuation, undefined);
+  assert.equal(timeoutResult.response.toast.type, 'error');
+  assert.equal(events.some((event) => event.event === 'approval_continuation_late_failed'), true);
+});
+
+test('handleCardAction deadline defaults to 2500ms and never claims success on submission failure', async () => {
+  const failureResult = await handleCardAction(
+    actionFixture(),
+    { qm: fakeQm({
+      getApproval: async () => approvalFixture(),
+      submitTurn: async () => { throw new Error('sensitive upstream body'); },
+    }) },
+  );
+  assert.equal(failureResult.response.toast.type, 'error');
+  assert.equal(failureResult.outcome.kind, 'failed');
+  assert.equal(failureResult.response.toast.content.includes('sensitive'), false);
 });
 
 // --- handleCardAction: reload + actor verification, fail-closed ---------

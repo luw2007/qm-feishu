@@ -22,6 +22,8 @@ function finiteNonNegative(value: unknown): value is number {
 }
 
 export class QmContractError extends Error {
+  readonly disposition = 'permanent' as const;
+
   constructor() {
     super('QM returned a malformed successful response');
     this.name = 'QmContractError';
@@ -31,6 +33,7 @@ export class QmContractError extends Error {
 export abstract class QmRequestError extends Error {
   readonly status: number;
   readonly errorCode?: string;
+  abstract readonly disposition: 'permanent' | 'transient';
 
   protected constructor(name: string, message: string, status: number, errorCode?: string) {
     super(message);
@@ -41,18 +44,23 @@ export abstract class QmRequestError extends Error {
 }
 
 export class QmAuthError extends QmRequestError {
+  readonly disposition = 'permanent' as const;
+
   constructor(status: number, errorCode?: string) {
     super('QmAuthError', `QM authentication failed with HTTP ${status}`, status, errorCode);
   }
 }
 
 export class QmPermanentError extends QmRequestError {
+  readonly disposition = 'permanent' as const;
+
   constructor(status: number, errorCode?: string) {
     super('QmPermanentError', `QM rejected the request with HTTP ${status}`, status, errorCode);
   }
 }
 
 export class QmTransientError extends QmRequestError {
+  readonly disposition = 'transient' as const;
   readonly retryAfterMs?: number;
 
   constructor(status: number, errorCode?: string, retryAfterMs?: number) {
@@ -62,6 +70,7 @@ export class QmTransientError extends QmRequestError {
 }
 
 export class QmTimeoutError extends Error {
+  readonly disposition = 'transient' as const;
   readonly timeoutMs: number;
 
   constructor(timeoutMs: number) {
@@ -72,6 +81,8 @@ export class QmTimeoutError extends Error {
 }
 
 export class QmNetworkError extends Error {
+  readonly disposition = 'transient' as const;
+
   constructor() {
     super('QM request failed before receiving an HTTP response');
     this.name = 'QmNetworkError';

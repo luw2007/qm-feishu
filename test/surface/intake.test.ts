@@ -103,7 +103,7 @@ function fakeQm(
 
 type FeishuCalls = { reply: { messageId: string; message: OutgoingMessage }[] };
 
-function fakeFeishu(order: string[]): { port: FeishuPort; calls: FeishuCalls } {
+function fakeFeishu(order: string[], overrides: Partial<FeishuPort> = {}): { port: FeishuPort; calls: FeishuCalls } {
   const calls: FeishuCalls = { reply: [] };
   const port: FeishuPort = {
     probe: notImplemented('probe'),
@@ -117,6 +117,7 @@ function fakeFeishu(order: string[]): { port: FeishuPort; calls: FeishuCalls } {
     update: notImplemented('update'),
     download: notImplemented('download'),
     upload: notImplemented('upload'),
+    ...overrides,
   };
   return { port, calls };
 }
@@ -307,7 +308,7 @@ test('handleIncomingMessage: duplicate message_id values reuse the same idempote
   assert.equal(qm.calls.submitTurn[1]!.idempotencyKey, 'feishu:message:om_test_dup_1');
 });
 
-test('handleIncomingMessage: an explicit stop input signals the active run instead of enqueueing a second run', async () => {
+test('handleIncomingMessage: an explicit stop input signals the active run and posts one sanitized terminal notice', async () => {
   const qm = fakeQm({ activeRunResult: 'run_active_1' });
   const feishu = fakeFeishu(qm.order);
   const message = baseMessage({ text: 'stop' });
@@ -321,6 +322,25 @@ test('handleIncomingMessage: an explicit stop input signals the active run inste
   assert.equal(qm.calls.submitTurn.length, 0);
   assert.equal(qm.calls.signalRun.length, 1);
   assert.deepEqual(qm.calls.signalRun[0], { runId: 'run_active_1', signal: { kind: 'abort' } });
+  assert.equal(feishu.calls.reply.length, 1);
+  assert.deepEqual(feishu.calls.reply[0], {
+    messageId: 'om_test_1',
+    message: { kind: 'text', text: 'Stopped.', uuid: 'terminal:stop:om_test_1' },
+  });
+});
+
+test('handleIncomingMessage: stop notice failure is best-effort and cannot turn an authoritative signal into an ordinary turn', async () => {
+  const qm = fakeQm({ activeRunResult: 'run_active_1' });
+  const feishu = fakeFeishu(qm.order, { reply: async () => { throw new Error('Feishu unavailable'); } });
+
+  const outcome = await handleIncomingMessage(baseMessage({ text: 'stop' }), { qm: qm.port, feishu: feishu.port }, {
+    botOpenId: BOT_OPEN_ID,
+    tenantKey: TENANT_KEY,
+  });
+
+  assert.deepEqual(outcome, { kind: 'signaled', runId: 'run_active_1', threadRef: 'feishu:dm:oc_test_dm_1' });
+  assert.equal(qm.calls.signalRun.length, 1);
+  assert.equal(qm.calls.submitTurn.length, 0);
 });
 
 test('handleIncomingMessage: stop text with no active run submits an ordinary turn', async () => {
@@ -375,10 +395,10 @@ test('handleIncomingMessage: acknowledgement is posted only after QM accepts the
   assert.equal(feishu.calls.reply[0]!.messageId, 'om_test_1');
 });
 
-test('handleIncomingMessage: a QM 403 is a terminal refusal, not a retried infrastructure failure', async () => {
+test('handleIncomingMessage: an addressed QM 403 posts exactly one sanitized terminal refusal notice', async () => {
   const qm = fakeQm({ refuse: true });
   const feishu = fakeFeishu(qm.order);
-  const message = baseMessage();
+  const message = baseMessage({ text: 'sensitive user command' });
 
   const outcome = await handleIncomingMessage(message, { qm: qm.port, feishu: feishu.port }, {
     botOpenId: BOT_OPEN_ID,
@@ -386,7 +406,25 @@ test('handleIncomingMessage: a QM 403 is a terminal refusal, not a retried infra
   });
 
   assert.deepEqual(outcome, { kind: 'refused', threadRef: 'feishu:dm:oc_test_dm_1' });
-  assert.equal(feishu.calls.reply.length, 0);
+  assert.equal(feishu.calls.reply.length, 1);
+  assert.deepEqual(feishu.calls.reply[0], {
+    messageId: 'om_test_1',
+    message: { kind: 'text', text: 'Request refused.', uuid: 'terminal:refused:om_test_1' },
+  });
+  assert.equal(JSON.stringify(feishu.calls.reply).includes('sensitive user command'), false);
+});
+
+test('handleIncomingMessage: refusal notice failure is best-effort and preserves the authoritative refusal', async () => {
+  const qm = fakeQm({ refuse: true });
+  const feishu = fakeFeishu(qm.order, { reply: async () => { throw new Error('Feishu unavailable'); } });
+
+  const outcome = await handleIncomingMessage(baseMessage(), { qm: qm.port, feishu: feishu.port }, {
+    botOpenId: BOT_OPEN_ID,
+    tenantKey: TENANT_KEY,
+  });
+
+  assert.deepEqual(outcome, { kind: 'refused', threadRef: 'feishu:dm:oc_test_dm_1' });
+  assert.equal(qm.calls.submitTurn.length, 1);
 });
 
 test('handleIncomingMessage: surface-cache failure does not roll back the accepted turn or resubmit it', async () => {

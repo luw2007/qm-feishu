@@ -26,6 +26,7 @@ export type RuntimeDeps = {
   createEventSource?: (config: ResolvedFeishuSurfaceConfig) => FeishuEventSource;
   createHealthServer?: (options: { host: string; port: number; metrics?: () => Record<string, number> }) => Promise<HealthServer>;
   renderApprovalCard?: (approval: ApprovalView) => OutgoingMessage;
+  approvalCallbackDeadlineMs?: number;
   log?: Logger;
   now?: () => number;
 };
@@ -136,7 +137,8 @@ export async function runFeishuSurface(config: FeishuSurfaceConfig, deps: Runtim
     metrics: () => ({ ...metrics }),
   });
   const approvalAbort = new AbortController();
-  const activeApprovalWatches = new Set<Promise<void>>();
+  const activeApprovalWatches = new Map<string, Promise<void>>();
+  const lateContinuationObservers = new Set<Promise<void>>();
   const renderCard = deps.renderApprovalCard ?? defaultRenderApprovalCard;
   const deliveryQm = instrumentDeliveryQm(qm, log, metrics);
   const dispatcher = new FeishuDeliveryDispatcher({
@@ -153,6 +155,8 @@ export async function runFeishuSurface(config: FeishuSurfaceConfig, deps: Runtim
 
   function watchAcceptedApproval(input: { runId: string; threadRef: string; destination: string }): void {
     if (stopped) return;
+    const key = `${input.threadRef}\u0000${input.runId}`;
+    if (activeApprovalWatches.has(key)) return;
     const watch: Promise<void> = watchApproval(
       input,
       { qm, feishu },
@@ -164,11 +168,16 @@ export async function runFeishuSurface(config: FeishuSurfaceConfig, deps: Runtim
       .catch((error: unknown) => {
         log({ event: 'approval_watch_failed', level: 'warn', errorClass: errorClassOf(error), runId: input.runId });
       });
-    activeApprovalWatches.add(watch);
-    void watch.then(
-      () => activeApprovalWatches.delete(watch),
-      () => activeApprovalWatches.delete(watch),
-    );
+    activeApprovalWatches.set(key, watch);
+    void watch.finally(() => activeApprovalWatches.delete(key));
+  }
+
+  function observeLateContinuation(late: Promise<{ runId: string; threadRef: string; destination: string } | undefined>): void {
+    const observer = late.then((continuation) => {
+      if (continuation && !isStopped()) watchAcceptedApproval(continuation);
+    });
+    lateContinuationObservers.add(observer);
+    void observer.finally(() => lateContinuationObservers.delete(observer));
   }
 
   async function onMessage(raw: unknown): Promise<void> {
@@ -208,8 +217,14 @@ export async function runFeishuSurface(config: FeishuSurfaceConfig, deps: Runtim
       return { toast: { type: 'error', content: 'This action could not be processed.' } };
     }
 
-    const { response, outcome } = await handleCardAction(action, { qm }, { log });
+    const { response, outcome, continuation, lateContinuation } = await handleCardAction(
+      action,
+      { qm },
+      { log, deadlineMs: deps.approvalCallbackDeadlineMs ?? 2500 },
+    );
     log({ event: 'approval_action_outcome', outcome: outcome.kind, requestId: action.requestId });
+    if (continuation && !isStopped()) watchAcceptedApproval(continuation);
+    if (lateContinuation) observeLateContinuation(lateContinuation);
     return response;
   }
 
@@ -259,7 +274,11 @@ export async function runFeishuSurface(config: FeishuSurfaceConfig, deps: Runtim
       health.setReady(false);
       clearInterval(lifecycleTimer);
       approvalAbort.abort();
-      const pending = [...activeApprovalWatches, ...(tick ? [tick] : [])];
+      const pending = [
+        ...activeApprovalWatches.values(),
+        ...lateContinuationObservers,
+        ...(tick ? [tick] : []),
+      ];
       const drain = Promise.allSettled([
         eventSource.stop(),
         Promise.allSettled(pending),

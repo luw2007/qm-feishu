@@ -41,11 +41,23 @@ export type WatchApprovalOutcome =
 
 const ACTIVE_RUN_STATUSES: ReadonlySet<RunView['status']> = new Set(['queued', 'running']);
 
+function isTransientWatcherError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { disposition?: unknown }).disposition === 'transient';
+}
+
+function terminalMessage(runId: string, status: RunView['status']): OutgoingMessage | undefined {
+  if (status === 'failed') {
+    return { kind: 'text', text: 'The run failed.', uuid: `terminal:failed:${runId}`.slice(0, 50) };
+  }
+  if (status === 'aborted') {
+    return { kind: 'text', text: 'The run was stopped.', uuid: `terminal:aborted:${runId}`.slice(0, 50) };
+  }
+  return undefined;
+}
+
 /**
- * A pending approval is not a normal durable delivery: it is discovered by
- * polling `pendingApproval(threadRef)` while the run stays active. The loop
- * stops at the first of two events (terminal run, or an approval appears),
- * so at most one card is ever sent per call.
+ * Pending approval is authoritative even when collect-mode has made the run
+ * appear terminal, so every poll checks it before the run disposition.
  */
 export async function watchApproval(
   input: WatchApprovalInput,
@@ -57,20 +69,32 @@ export async function watchApproval(
 
   for (;;) {
     if (options.signal?.aborted) return { kind: 'cancelled' };
-    const run = await ports.qm.getRun(input.runId);
-    if (options.signal?.aborted) return { kind: 'cancelled' };
-    if (!ACTIVE_RUN_STATUSES.has(run.status)) {
-      return { kind: 'terminal', status: run.status };
-    }
+    try {
+      const approval = await ports.qm.pendingApproval(input.threadRef);
+      if (options.signal?.aborted) return { kind: 'cancelled' };
+      if (approval) {
+        const target = parseDeliveryTarget(input.destination);
+        if (!target) throw new Error(`watchApproval: malformed destination ${input.destination}`);
+        await ports.feishu.send(target, options.renderCard(approval));
+        log({ event: 'approval_card_sent', requestId: approval.requestId });
+        return { kind: 'card_sent', requestId: approval.requestId };
+      }
 
-    const approval = await ports.qm.pendingApproval(input.threadRef);
-    if (options.signal?.aborted) return { kind: 'cancelled' };
-    if (approval) {
-      const target = parseDeliveryTarget(input.destination);
-      if (!target) throw new Error(`watchApproval: malformed destination ${input.destination}`);
-      await ports.feishu.send(target, options.renderCard(approval));
-      log({ event: 'approval_card_sent', requestId: approval.requestId });
-      return { kind: 'card_sent', requestId: approval.requestId };
+      const run = await ports.qm.getRun(input.runId);
+      if (options.signal?.aborted) return { kind: 'cancelled' };
+      if (!ACTIVE_RUN_STATUSES.has(run.status)) {
+        const message = terminalMessage(input.runId, run.status);
+        if (message) {
+          const target = parseDeliveryTarget(input.destination);
+          if (!target) throw new Error(`watchApproval: malformed destination ${input.destination}`);
+          await ports.feishu.send(target, message);
+          log({ event: 'approval_terminal_notice_sent', runId: input.runId, status: run.status });
+        }
+        return { kind: 'terminal', status: run.status };
+      }
+    } catch (error) {
+      if (!isTransientWatcherError(error)) throw error;
+      log({ event: 'approval_watch_retry', runId: input.runId, errorClass: error instanceof Error ? error.name : 'UnknownError' });
     }
 
     await delay(pollIntervalMs, options.signal);
@@ -86,7 +110,14 @@ export type ApprovalActionOutcome =
   | { kind: 'stale'; requestId: string }
   | { kind: 'missing'; requestId: string }
   | { kind: 'malformed'; requestId: string }
-  | { kind: 'mismatch'; requestId: string };
+  | { kind: 'mismatch'; requestId: string }
+  | { kind: 'failed'; requestId: string };
+
+export type ApprovalContinuation = {
+  runId: string;
+  threadRef: string;
+  destination: string;
+};
 
 export type CardCallbackResponse = {
   toast: { type: 'success' | 'error'; content: string };
@@ -112,22 +143,65 @@ function toastFor(outcome: ApprovalActionOutcome): CardCallbackResponse {
       return { toast: { type: 'error', content: 'That approval scope is not permitted for this request.' } };
     case 'mismatch':
       return { toast: { type: 'error', content: 'Only the requester can act on this approval.' } };
+    case 'failed':
+      return { toast: { type: 'error', content: 'This action could not be processed.' } };
   }
 }
 
-/**
- * Resolves the card-action outcome and returns a callback response without
- * waiting for the QM continuation turn to run: the continuation is submitted
- * but its own agent run is never awaited here, so callback latency stays
- * independent of run duration.
- */
+const CALLBACK_DEADLINE_MS = 2500;
+
+type DeadlineResult<T> = { kind: 'value'; value: T } | { kind: 'deadline' };
+
+function withinDeadline<T>(promise: Promise<T>, deadlineAt: number): Promise<DeadlineResult<T>> {
+  const remainingMs = deadlineAt - Date.now();
+  if (remainingMs <= 0) return Promise.resolve({ kind: 'deadline' });
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      settled = true;
+      resolve({ kind: 'deadline' });
+    }, remainingMs);
+    void promise.then(
+      (value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve({ kind: 'value', value });
+      },
+      (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(error instanceof Error ? error : new Error('Promise rejected with a non-Error value'));
+      },
+    );
+  });
+}
+
+export type ApprovalActionResult = {
+  response: CardCallbackResponse;
+  outcome: ApprovalActionOutcome;
+  continuation?: ApprovalContinuation;
+  lateContinuation?: Promise<ApprovalContinuation | undefined>;
+};
+
 export async function handleCardAction(
   action: NormalizedCardAction,
   ports: { qm: QmPort },
-  options: { log?: LogFn } = {},
-): Promise<{ response: CardCallbackResponse; outcome: ApprovalActionOutcome }> {
+  options: { log?: LogFn; deadlineMs?: number } = {},
+): Promise<ApprovalActionResult> {
   const log = options.log ?? (() => undefined);
-  const approval = await ports.qm.getApproval(action.requestId);
+  const deadlineAt = Date.now() + (options.deadlineMs ?? CALLBACK_DEADLINE_MS);
+  let approval: ApprovalView | null;
+  try {
+    const loaded = await withinDeadline(ports.qm.getApproval(action.requestId), deadlineAt);
+    if (loaded.kind === 'deadline') throw new Error('ApprovalCallbackDeadline');
+    approval = loaded.value;
+  } catch (error) {
+    const outcome: ApprovalActionOutcome = { kind: 'failed', requestId: action.requestId };
+    log({ event: 'approval_action_failed', requestId: action.requestId, errorClass: error instanceof Error ? error.name : 'UnknownError' });
+    return { response: toastFor(outcome), outcome };
+  }
   const request = approval?.request;
 
   let outcome: ApprovalActionOutcome;
@@ -150,8 +224,6 @@ export async function handleCardAction(
     outcome = { kind: 'accepted', requestId: action.requestId, scope: SCOPE_BY_ACTION[action.action] };
   }
 
-  const response = toastFor(outcome);
-
   if (
     (outcome.kind === 'accepted' || outcome.kind === 'denied') &&
     request?.conversation &&
@@ -162,13 +234,9 @@ export async function handleCardAction(
     const turn: SurfaceTurn = {
       text: '',
       actor: { externalId: action.operatorOpenId },
-      conversation: {
-        id: conversation.channelRef,
-        kind: conversation.kind,
-      },
+      conversation: { id: conversation.channelRef, kind: conversation.kind },
       threadRef: conversation.threadRef,
       destination,
-
       surface: 'feishu',
       addressed: true,
       surfaceTools: false,
@@ -181,16 +249,42 @@ export async function handleCardAction(
           ? { requestId: action.requestId, approved: true, scope: outcome.scope }
           : { requestId: action.requestId, approved: false },
     };
-    void ports.qm.submitTurn(turn).catch((error: unknown) => {
-      log({
-        event: 'approval_continuation_failed',
-        requestId: action.requestId,
-        errorClass: error instanceof Error ? error.name : 'UnknownError',
-      });
-    });
-  } else {
-    log({ event: 'approval_action_rejected', requestId: action.requestId, outcome: outcome.kind });
+    const submission = ports.qm.submitTurn(turn);
+    try {
+      const queued = await withinDeadline(submission, deadlineAt);
+      if (queued.kind === 'value') {
+        return {
+          response: toastFor(outcome),
+          outcome,
+          continuation: { runId: queued.value.runId, threadRef: conversation.threadRef, destination },
+        };
+      }
+
+      const failed: ApprovalActionOutcome = { kind: 'failed', requestId: action.requestId };
+      const lateContinuation = submission.then(
+        (lateQueued): ApprovalContinuation => ({
+          runId: lateQueued.runId,
+          threadRef: conversation.threadRef,
+          destination,
+        }),
+        (error: unknown) => {
+          log({
+            event: 'approval_continuation_late_failed',
+            requestId: action.requestId,
+            errorClass: error instanceof Error ? error.name : 'UnknownError',
+          });
+          return undefined;
+        },
+      );
+      log({ event: 'approval_continuation_timed_out', requestId: action.requestId });
+      return { response: toastFor(failed), outcome: failed, lateContinuation };
+    } catch (error) {
+      const failed: ApprovalActionOutcome = { kind: 'failed', requestId: action.requestId };
+      log({ event: 'approval_continuation_failed', requestId: action.requestId, errorClass: error instanceof Error ? error.name : 'UnknownError' });
+      return { response: toastFor(failed), outcome: failed };
+    }
   }
 
-  return { response, outcome };
+  log({ event: 'approval_action_rejected', requestId: action.requestId, outcome: outcome.kind });
+  return { response: toastFor(outcome), outcome };
 }

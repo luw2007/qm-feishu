@@ -322,6 +322,69 @@ function fileAttachment(overrides: Partial<DeliveryAttachment> = {}): DeliveryAt
   return { kind: 'file', id: 'artifact_test_1', filename: 'report.pdf', mediaType: 'application/pdf', viewerId: 'ou_viewer_1', ...overrides };
 }
 
+test('FeishuDeliveryDispatcher: attachment-only delivery skips empty text, preserves attachment order and UUIDs, then acks', async () => {
+  const events: string[] = [];
+  const sentMessages: OutgoingMessage[] = [];
+  const qm = fakeDeliveryQm({
+    claimDeliveries: async () => [delivery({ text: '', attachments: [blobAttachment(), fileAttachment()] })],
+    readBlob: async () => streamOf(new Uint8Array([1, 2, 3])),
+    readFileArtifact: async () => streamOf(new Uint8Array([4, 5, 6])),
+    ackDelivery: async (id) => {
+      events.push(`ack:${id}`);
+    },
+  });
+  const feishu = fakeDeliveryFeishu({
+    send: async (_target, message) => {
+      sentMessages.push(message);
+      events.push(`send:${message.kind}`);
+      return { messageId: `om_test_${String(sentMessages.length)}` };
+    },
+    upload: async (file) =>
+      file.kind === 'image'
+        ? { kind: 'image', key: 'img_key_uploaded_1' }
+        : { kind: 'file', key: 'file_key_uploaded_1' },
+  });
+  const dispatcher = new FeishuDeliveryDispatcher({ qm, feishu });
+
+  await dispatcher.poll();
+
+  assert.deepEqual(sentMessages.map((message) => message.kind), ['image', 'file']);
+  assert.deepEqual(
+    sentMessages.map((message) => message.uuid),
+    [derivePartUuid('key_test_1', 0, 'attachment'), derivePartUuid('key_test_1', 1, 'attachment')],
+  );
+  assert.deepEqual(events, ['send:image', 'send:file', 'ack:delivery_test_1']);
+});
+
+test('FeishuDeliveryDispatcher: empty delivery makes no Feishu call and may be acknowledged', async () => {
+  let sendCalls = 0;
+  let uploadCalls = 0;
+  const acked: string[] = [];
+  const qm = fakeDeliveryQm({
+    claimDeliveries: async () => [delivery({ text: '', attachments: [] })],
+    ackDelivery: async (id) => {
+      acked.push(id);
+    },
+  });
+  const feishu = fakeDeliveryFeishu({
+    send: async () => {
+      sendCalls += 1;
+      throw new Error('must not send empty text');
+    },
+    upload: async () => {
+      uploadCalls += 1;
+      throw new Error('must not upload without attachments');
+    },
+  });
+  const dispatcher = new FeishuDeliveryDispatcher({ qm, feishu });
+
+  await dispatcher.poll();
+
+  assert.equal(sendCalls, 0);
+  assert.equal(uploadCalls, 0);
+  assert.deepEqual(acked, ['delivery_test_1']);
+});
+
 test('FeishuDeliveryDispatcher: text then attachments send in order, uploaded to Feishu before each idempotent message part', async () => {
   const sentMessages: OutgoingMessage[] = [];
   const uploaded: OutgoingFile[] = [];

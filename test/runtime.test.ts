@@ -441,15 +441,28 @@ void test('an accepted intake submits the decoded turn, acks the message, and st
   }
 });
 
-void test('a card action after restart reconstructs continuation context from QM and returns a toast', async () => {
+void test('a card action after restart reconstructs continuation context, waits for queue acceptance, and re-arms a chained watch', async () => {
   const eventSource = controllableEventSource();
   const continuationTurns: unknown[] = [];
+  const queued = deferred<{ runId: string; queued: true; steered: false }>();
+  let pendingCalls = 0;
+  const sent: OutgoingMessage[] = [];
   const deps: RuntimeDeps = {
+    approvalCallbackDeadlineMs: 100,
     createQmClient: () =>
       fakeQm({
         submitTurn: async (turn) => {
           continuationTurns.push(turn);
-          return { runId: 'run_test_1', queued: true, steered: false };
+          return queued.promise;
+        },
+        getRun: async () => ({ runId: 'run_chained_1', status: 'running' }),
+        pendingApproval: async () => {
+          pendingCalls += 1;
+          return {
+            requestId: 'req_chained_2',
+            status: 'pending',
+            grantModes: { once: true, session: false, always: false },
+          };
         },
         getApproval: async () => ({
           requestId: 'req_test_1',
@@ -467,16 +480,23 @@ void test('a card action after restart reconstructs continuation context from QM
           },
         }),
       }),
-    createFeishuClient: () => fakeFeishu(),
+    createFeishuClient: () => fakeFeishu({
+      send: async (_target, message) => {
+        sent.push(message);
+        return { messageId: 'om_test_chained_card_1' };
+      },
+    }),
     createEventSource: () => eventSource.source,
   };
 
   const handle = await runFeishuSurface(testConfig(), deps);
   try {
-    const response = await eventSource.emitCardAction(cardActionFixture());
-    assert.deepEqual(response, { toast: { type: 'success', content: 'Approved.' } });
+    const callback = eventSource.emitCardAction(cardActionFixture());
+    assert.equal(await Promise.race([callback.then(() => 'settled'), delay(10).then(() => 'pending')]), 'pending');
+    queued.resolve({ runId: 'run_chained_1', queued: true, steered: false });
+    assert.deepEqual(await callback, { toast: { type: 'success', content: 'Approved.' } });
 
-    await waitFor(() => continuationTurns.length === 1);
+    assert.equal(continuationTurns.length, 1);
     const continuation = continuationTurns[0] as {
       threadRef?: string;
       destination?: string;
@@ -487,6 +507,129 @@ void test('a card action after restart reconstructs continuation context from QM
     assert.equal(continuation.destination, 'chat:oc_test_dm_1:message:om_test_1');
     assert.deepEqual(continuation.conversation, { id: 'oc_test_dm_1', kind: 'dm' });
     assert.deepEqual(continuation.approval, { requestId: 'req_test_1', approved: true, scope: 'once' });
+    await waitFor(() => sent.length === 1);
+    assert.equal(pendingCalls, 1);
+  } finally {
+    await handle.stop();
+  }
+});
+
+void test('concurrent timed-out callbacks that later queue the same continuation re-arm exactly one watcher', async () => {
+  const eventSource = controllableEventSource();
+  const queued = deferred<{ runId: string; queued: true; steered: false }>();
+  let sendCalls = 0;
+  const deps: RuntimeDeps = {
+    approvalCallbackDeadlineMs: 5,
+    createQmClient: () => fakeQm({
+      submitTurn: async () => queued.promise,
+      pendingApproval: async () => ({
+        requestId: 'req_late_2', status: 'pending',
+        grantModes: { once: true, session: false, always: false },
+      }),
+      getApproval: async () => ({
+        requestId: 'req_test_1', status: 'pending',
+        grantModes: { once: true, session: false, always: false },
+        request: {
+          actor: { externalId: 'ou_test_operator_1' },
+          surface: 'feishu',
+          deliveryTarget: 'chat:oc_test_dm_1:message:om_test_1',
+          conversation: {
+            kind: 'dm', threadRef: 'feishu:dm:oc_test_dm_1', channelRef: 'oc_test_dm_1',
+          },
+        },
+      }),
+    }),
+    createFeishuClient: () => fakeFeishu({
+      send: async () => {
+        sendCalls += 1;
+        return { messageId: 'om_test_late_card_1' };
+      },
+    }),
+    createEventSource: () => eventSource.source,
+  };
+
+  const handle = await runFeishuSurface(testConfig(), deps);
+  try {
+    const responses = await Promise.all([
+      eventSource.emitCardAction(cardActionFixture()),
+      eventSource.emitCardAction(cardActionFixture()),
+    ]);
+    assert.deepEqual(responses, [
+      { toast: { type: 'error', content: 'This action could not be processed.' } },
+      { toast: { type: 'error', content: 'This action could not be processed.' } },
+    ]);
+
+    queued.resolve({ runId: 'run_late_shared_1', queued: true, steered: false });
+    await waitFor(() => sendCalls === 1);
+    assert.equal(sendCalls, 1);
+  } finally {
+    await handle.stop();
+  }
+});
+
+void test('runtime deduplicates simultaneous approval watches by authoritative thread and run', async () => {
+  const eventSource = controllableEventSource();
+  const gate = deferred<{ runId: string; status: 'running' }>();
+  let getRunCalls = 0;
+  const deps: RuntimeDeps = {
+    createQmClient: () => fakeQm({
+      submitTurn: async () => ({ runId: 'run_shared_1', queued: true, steered: true }),
+      pendingApproval: async () => null,
+      getRun: async () => {
+        getRunCalls += 1;
+        return gate.promise;
+      },
+    }),
+    createFeishuClient: () => fakeFeishu(),
+    createEventSource: () => eventSource.source,
+  };
+
+  const handle = await runFeishuSurface(testConfig(), deps);
+  try {
+    await Promise.all([
+      eventSource.emitMessage(messageFixture()),
+      eventSource.emitMessage(messageFixture({
+        event_id: 'evt_test_direct_2',
+        message: {
+          message_id: 'om_test_direct_2',
+          create_time: '1700000000001',
+          chat_id: 'oc_test_dm_1',
+          chat_type: 'p2p',
+          message_type: 'text',
+          content: JSON.stringify({ text: 'follow up' }),
+        },
+      })),
+    ]);
+    await waitFor(() => getRunCalls === 1);
+    assert.equal(getRunCalls, 1);
+  } finally {
+    gate.resolve({ runId: 'run_shared_1', status: 'running' });
+    await handle.stop();
+  }
+});
+
+void test('the next same-thread inbound message after restart re-arms the QM-authoritative active run without local state', async () => {
+  const eventSource = controllableEventSource();
+  let pendingCalls = 0;
+  const deps: RuntimeDeps = {
+    createQmClient: () => fakeQm({
+      submitTurn: async () => ({ runId: 'run_existing_1', queued: true, steered: true }),
+      pendingApproval: async () => {
+        pendingCalls += 1;
+        return {
+          requestId: 'req_existing_1', status: 'pending',
+          grantModes: { once: true, session: false, always: false },
+        };
+      },
+    }),
+    createFeishuClient: () => fakeFeishu(),
+    createEventSource: () => eventSource.source,
+  };
+  const handle = await runFeishuSurface(testConfig(), deps);
+  try {
+    await eventSource.emitMessage(messageFixture());
+    await waitFor(() => pendingCalls === 1);
+    assert.equal(pendingCalls, 1);
   } finally {
     await handle.stop();
   }

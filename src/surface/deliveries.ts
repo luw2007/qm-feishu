@@ -188,7 +188,7 @@ export class FeishuDeliveryDispatcher {
   }
 
   async #send(delivery: Delivery, target: FeishuTarget): Promise<void> {
-    const parts = splitDeliveryText(delivery.text, this.#maxPartChars);
+    const parts = delivery.text.length === 0 ? [] : splitDeliveryText(delivery.text, this.#maxPartChars);
     let lastReceipt: MessageReceipt | undefined;
     try {
       for (const [index, part] of parts.entries()) {

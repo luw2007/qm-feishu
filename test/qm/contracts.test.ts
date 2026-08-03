@@ -2,13 +2,27 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  QmAuthError,
   QmContractError,
+  QmNetworkError,
+  QmPermanentError,
+  QmTimeoutError,
+  QmTransientError,
   decodeApproval,
   decodeBlobRef,
   decodeDeliveries,
   decodeQueuedRun,
   decodeRunView,
 } from '../../src/qm/contracts.js';
+
+test('QM errors expose structural retry dispositions without weakening permanent failures', () => {
+  for (const error of [new QmTransientError(503), new QmTimeoutError(10), new QmNetworkError()]) {
+    assert.equal(error.disposition, 'transient');
+  }
+  for (const error of [new QmAuthError(401), new QmPermanentError(400), new QmContractError()]) {
+    assert.equal(error.disposition, 'permanent');
+  }
+});
 
 test('contract decoders map current QM responses into the public port types', () => {
   assert.deepEqual(decodeQueuedRun({ status: 'queued', runId: 'run_test_1', steered: true }), {

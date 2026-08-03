@@ -158,6 +158,11 @@ export async function handleIncomingMessage(
     const activeRunId = await ports.qm.activeRun(threadRef);
     if (activeRunId !== undefined) {
       await ports.qm.signalRun(activeRunId, { kind: 'abort' });
+      await ports.feishu.reply(message.messageId, {
+        kind: 'text',
+        text: 'Stopped.',
+        uuid: `terminal:stop:${message.messageId}`.slice(0, 50),
+      }).catch(() => undefined);
       return { kind: 'signaled', runId: activeRunId, threadRef };
     }
   }
@@ -189,7 +194,14 @@ export async function handleIncomingMessage(
   try {
     queued = await ports.qm.submitTurn(turn);
   } catch (error) {
-    if (isRefusedTurn(error)) return { kind: 'refused', threadRef };
+    if (isRefusedTurn(error)) {
+      await ports.feishu.reply(message.messageId, {
+        kind: 'text',
+        text: 'Request refused.',
+        uuid: `terminal:refused:${message.messageId}`.slice(0, 50),
+      }).catch(() => undefined);
+      return { kind: 'refused', threadRef };
+    }
     throw error;
   }
 
