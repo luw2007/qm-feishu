@@ -72,8 +72,8 @@ test(`QM source-auth contract at revision ${QM_REVISION}`, { skip: skipReason },
     assert.equal('replayed' in first, false);
     if ('replayed' in first) return;
     let status = (await client.getRun(first.runId)).status;
-    for (let attempt = 0; attempt < 1_000 && status === 'queued'; attempt += 1) {
-      await new Promise<void>((resolve) => setImmediate(resolve));
+    for (let attempt = 0; attempt < 1_000 && (status === 'queued' || status === 'running'); attempt += 1) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
       status = (await client.getRun(first.runId)).status;
     }
     assert.equal(status, 'completed');
