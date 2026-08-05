@@ -144,7 +144,7 @@ jobs:
           docker stop --time 20 qm-feishu-smoke
           test "$(docker inspect qm-feishu-smoke --format '{{.State.ExitCode}}')" = "0"
       - name: Scan candidate image
-        uses: aquasecurity/trivy-action@ea165f8d65b6e75b540449e92b4886f43607fa02 # 0.33.1
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
         with:
           image-ref: qm-feishu:candidate
           severity: HIGH,CRITICAL
