@@ -37,7 +37,7 @@ Record only a timestamp and the last six characters of a synthetic message/event
 | Group mention | Exactly one explicit mention creates one turn | 2026-08-04T13:19:03Z | `2e2c26` | [x] |
 | Unmentioned group message | No QM turn and no acknowledgement | 2026-08-04T13:53:07Z | `N/A` | [x] |
 | Topic follow-up | Reply remains rooted at the topic root | PENDING | PENDING | [ ] |
-| Stop during active run | Active run receives abort; no second run | PENDING | PENDING | [ ] |
+| Stop during active run | Active run receives abort; no second run | 2026-08-05T14:49:03Z | `3ccbdd` | [x] |
 | Ordinary follow-up during active run | Follow-up is accepted as steer/turn per QM response | PENDING | PENDING | [ ] |
 | Incoming image in bot DM | Standalone image stages a blob with digest and metadata | 2026-08-05T13:33:23Z | `13f1af` | [x] |
 | Incoming generic file in bot DM | Standalone file stages a blob with filename/media metadata | 2026-08-05T08:20:41Z | `576d47` | [x] |
@@ -67,6 +67,8 @@ On 2026-08-05, two real user events that had failed before intake were correlate
 Feishu attachment messages cannot contain an explicit bot mention. The adapter intentionally keeps the narrow `im:message.group_at_msg:readonly` scope, so a standalone group attachment is not delivered and cannot be safely associated with an earlier mention. Incoming attachment acceptance therefore uses the bot direct chat only: send the image or file as a standalone message with no text and no mention. Corrected DM instruction `984e69` was followed by real user file `576d47` at 2026-08-05T08:20:41Z. The adapter received that exact message, completed resource download and QM blob staging before accepting the attachment turn, and reported no decode, intake, acknowledgement, or send failure. QM then emitted a terminal Docker-daemon error from its local sandbox worker; that later execution failure is outside the attachment-transfer contract. Together with the later image evidence, both DM attachment rows pass.
 
 Real user DM image `13f1af` at 2026-08-05T13:33:23Z completed the same attachment-transfer sequence with the 10 MB image bound: the adapter received the exact `message_type=image` ID, downloaded and staged the image before `intake_outcome=accepted`, acknowledged the delivery, and emitted no decode, intake, acknowledgement, or send failure. The user then saw `Got it, working on it.`, followed by the Docker-daemon error and `The run failed.`; the latter two messages are QM worker execution outcomes after attachment acceptance and do not invalidate image transfer.
+
+Live stop acceptance used an isolated in-memory QM process with `BACKGROUND_WORK_ENABLED=false` so a real user turn remained non-terminal without requiring the unavailable Docker sandbox. The real Feishu WebSocket, source-auth HTTP client, intake handler, and Feishu reply path were unchanged. Real user DM seed `b38a28` at 2026-08-05T14:48:54Z created the sole active run and received acknowledgement `189582`; real user text `stop` (`3ccbdd`) arrived in the same DM root/thread at 2026-08-05T14:49:03Z. The adapter reported `intake_outcome=signaled`, QM retained the same active run ID instead of creating a second run, and Feishu recorded bot receipt `58ad4f` with `Stopped.`. The disabled worker stabilized the observation window; it did not replace any surface boundary under test.
 
 ## Local and CI gates
 
