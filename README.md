@@ -7,11 +7,13 @@ An independently deployable Feishu/Lark message surface for [QM](https://github.
 - direct messages and explicitly mentioned group messages
 - topic/reply-chain continuity
 - active-run stop and ordinary follow-up steering
-- durable text and attachment delivery
+- direct-message input attachments and durable outbound attachment delivery
 - proactive principal delivery when explicitly enabled
 - requester-verified command approval cards
 
 Non-goals: group history ingestion, reactions, streaming edits, user-token impersonation, cross-tenant chats, and automatic Slack/Feishu identity merging.
+
+Feishu sends attachments as standalone messages and does not allow an explicit bot mention on the same message. Incoming image and file messages are therefore supported only in a direct chat with the bot. Group attachments remain out of scope: the adapter intentionally requests `im:message.group_at_msg:readonly`, not broad group-message access, and never associates an unmentioned attachment with an earlier mention.
 
 ## Requirements
 

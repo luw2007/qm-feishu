@@ -25,6 +25,7 @@ Do not mark the release complete until every field below is populated with redac
 4. Export runtime secrets outside the repository. Confirm shell history and command tracing are disabled.
 5. Start one adapter instance. Enable `FEISHU_CLAIM_PRINCIPAL_DELIVERIES=1` only after confirming no other principal surface is claiming deliveries.
 6. Confirm `GET /healthz` is `200`, `GET /readyz` is `200`, and `/metrics` contains integer counters without identifiers.
+7. Test incoming image and file messages only in the bot direct chat. Send each attachment as a standalone message without text or a mention. Feishu does not permit a mention on an attachment message; group attachments are outside the first-release intake contract.
 
 ## Smoke matrix
 
@@ -38,8 +39,8 @@ Record only a timestamp and the last six characters of a synthetic message/event
 | Topic follow-up | Reply remains rooted at the topic root | PENDING | PENDING | [ ] |
 | Stop during active run | Active run receives abort; no second run | PENDING | PENDING | [ ] |
 | Ordinary follow-up during active run | Follow-up is accepted as steer/turn per QM response | PENDING | PENDING | [ ] |
-| Incoming image | Blob staged with digest and metadata | PENDING | PENDING | [ ] |
-| Incoming generic file | Blob staged with filename/media metadata | PENDING | PENDING | [ ] |
+| Incoming image in bot DM | Standalone image stages a blob with digest and metadata | PENDING | PENDING | [ ] |
+| Incoming generic file in bot DM | Standalone file stages a blob with filename/media metadata | PENDING | PENDING | [ ] |
 | Outgoing file | Upload and idempotent file message precede delivery ack | PENDING | PENDING | [ ] |
 | Allow once | Matching requester continues once with scope `once` | PENDING | PENDING | [ ] |
 | Deny | Matching requester continues with no approval scope | PENDING | PENDING | [ ] |
@@ -62,6 +63,8 @@ At 2026-08-04T13:53:07Z, the synthetic user confirmed sending standalone text `u
 The acceptance OAuth probe did not provide a supported user-send path. Its local per-app user token was deleted. Open Platform retained `offline_access` as an OAuth base grant and accepted a deletion draft for the user identity of `im:message` while preserving the tenant/app grant. App version `1.0.6` remains audited but unpublished; direct lifecycle requests were rejected with platform code `10002`, so no remote version transition is claimed.
 
 On 2026-08-05, two real user events that had failed before intake were correlated through separately authorized, read-only user history metadata: suffix `dda1e2` at 2026-08-05T04:28:55Z and suffix `eaa396` at 2026-08-05T04:31:02Z were both `post` messages, not native `file` or `image` messages. Their receive-side bodies used top-level `{ title, content, content_v2 }`, while the adapter accepted only the send-side multilingual `{ post: { <lang>: ... } }` envelope. The decoder now accepts both structures, and a built-artifact synthetic smoke covered mention text plus an embedded image without routing that image through the native attachment downloader. This does not satisfy the incoming image or generic-file rows; both remain unchecked until a real `message_type=image` or `message_type=file` event stages a QM blob.
+
+Feishu attachment messages cannot contain an explicit bot mention. The adapter intentionally keeps the narrow `im:message.group_at_msg:readonly` scope, so a standalone group attachment is not delivered and cannot be safely associated with an earlier mention. Incoming attachment acceptance therefore uses the bot direct chat only: send the image or file as a standalone message with no text and no mention. Corrected DM instruction `537217` was delivered with nonce `qm-feishu-dm-file-1785907611505`; no subsequent real-user file event arrived during the bounded observation window, so both incoming attachment rows remain unchecked.
 
 ## Local and CI gates
 
