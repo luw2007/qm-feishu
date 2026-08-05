@@ -10,8 +10,30 @@ function nonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
 }
 
+export type FeishuDecodeReason =
+  | 'content_not_json'
+  | 'invalid_post_content'
+  | 'invalid_content'
+  | 'invalid_text_content'
+  | 'invalid_image_content'
+  | 'invalid_file_content'
+  | 'not_an_object'
+  | 'missing_event_id'
+  | 'missing_sender'
+  | 'missing_sender_open_id'
+  | 'missing_sender_type'
+  | 'missing_message'
+  | 'missing_message_id'
+  | 'missing_chat_id'
+  | 'invalid_chat_type'
+  | 'unsupported_message_type'
+  | 'invalid_create_time'
+  | 'missing_content'
+  | 'invalid_message_response';
+
+
 export class FeishuDecodeError extends Error {
-  constructor(reason: string) {
+  constructor(readonly reason: FeishuDecodeReason) {
     super(`Feishu message event is malformed: ${reason}`);
     this.name = 'FeishuDecodeError';
   }

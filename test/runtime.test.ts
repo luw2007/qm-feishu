@@ -809,6 +809,41 @@ void test('log events flowing through the shared logger redact message content a
   }
 });
 
+void test('message decode failures log only the safe decoder reason', async () => {
+  const eventSource = controllableEventSource();
+  const { log, events } = captureLog();
+  const deps: RuntimeDeps = {
+    createQmClient: () => fakeQm(),
+    createFeishuClient: () => fakeFeishu(),
+    createEventSource: () => eventSource.source,
+    log,
+  };
+  const handle = await runFeishuSurface(testConfig(), deps);
+  try {
+    await eventSource.emitMessage(messageFixture({
+      message: {
+        message_id: 'om_secret_message',
+        create_time: '1700000000000',
+        chat_id: 'oc_secret_chat',
+        chat_type: 'p2p',
+        message_type: 'file',
+        content: JSON.stringify({ file_key: '', file_name: 'secret.txt' }),
+      },
+    }));
+
+    const failure = events.find((event) => event.event === 'message_decode_failed');
+    assert.deepEqual(failure, {
+      event: 'message_decode_failed',
+      level: 'warn',
+      errorClass: 'FeishuDecodeError',
+      decodeReason: 'invalid_file_content',
+    });
+    assert.doesNotMatch(JSON.stringify(events), /secret/);
+  } finally {
+    await handle.stop();
+  }
+});
+
 // --- bounded, idempotent shutdown ----------------------------------------
 
 void test('shutdown is idempotent: concurrent stop() calls only stop dependencies once', async () => {

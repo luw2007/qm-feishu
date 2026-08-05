@@ -11,7 +11,7 @@ import { FeishuSdkClient } from './feishu/client.js';
 import { FeishuSdkEventSource } from './feishu/events.js';
 import { feishuOpenApiHost } from './setup/feishu-api.js';
 import { decodeCardAction, renderApprovalCard as defaultRenderApprovalCard } from './feishu/cards.js';
-import { decodeReceivedMessage } from './feishu/messages.js';
+import { decodeReceivedMessage, FeishuDecodeError } from './feishu/messages.js';
 import { handleIncomingMessage } from './surface/intake.js';
 import { FeishuDeliveryDispatcher } from './surface/deliveries.js';
 import { handleCardAction, watchApproval } from './surface/approvals.js';
@@ -198,7 +198,12 @@ export async function runFeishuSurface(config: FeishuSurfaceConfig, deps: Runtim
     try {
       message = decodeReceivedMessage(raw);
     } catch (error) {
-      log({ event: 'message_decode_failed', level: 'warn', errorClass: errorClassOf(error) });
+      log({
+        event: 'message_decode_failed',
+        level: 'warn',
+        errorClass: errorClassOf(error),
+        ...(error instanceof FeishuDecodeError ? { decodeReason: error.reason } : {}),
+      });
       return;
     }
 
