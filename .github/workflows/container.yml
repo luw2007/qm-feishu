@@ -29,6 +29,7 @@ jobs:
           docker rm -f qm-feishu-inspect
           grep -q '^app/dist/main.js$' /tmp/image-files.txt
           grep -q '^app/package.json$' /tmp/image-files.txt
+          grep -q '^app/LICENSE$' /tmp/image-files.txt
           ! grep -E '^app/(src|test|docs|fixtures)/' /tmp/image-files.txt
           ! grep -E '^app/\.env($|\.)' /tmp/image-files.txt
 

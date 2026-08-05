@@ -12,7 +12,6 @@ docs
 !.env.example
 *.log
 *.payload.json
-LICENSE
 README.md
 SECURITY.md
 mcp-gateway

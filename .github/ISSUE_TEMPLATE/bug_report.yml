@@ -1,0 +1,72 @@
+name: Bug report
+description: Report reproducible qm-feishu behavior
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, tenant identifiers, raw event payloads, commands, file contents, or message contents. Report security issues privately through the process in SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: qm-feishu version or commit
+      placeholder: v0.1.0 or full commit SHA
+    validations:
+      required: true
+  - type: input
+    id: qm_revision
+    attributes:
+      label: QM revision
+      description: Use the commit SHA; do not include private repository URLs.
+    validations:
+      required: true
+  - type: input
+    id: node_version
+    attributes:
+      label: Node.js version
+      placeholder: 24.x
+    validations:
+      required: true
+  - type: dropdown
+    id: brand
+    attributes:
+      label: Platform
+      options:
+        - Feishu
+        - Lark
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Use synthetic IDs and sanitized input only.
+      placeholder: |
+        1. Configure...
+        2. Send...
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and redacted logs
+      description: Include event names and error classes only; redact identifiers and content.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Data safety
+      options:
+        - label: I removed credentials, tenant identifiers, raw payloads, commands, file contents, and message contents.
+          required: true
+        - label: This report is not a security vulnerability.
+          required: true

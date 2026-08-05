@@ -19,6 +19,10 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - name: Verify public dependency provenance
+        run: |
+          test "$(npm config get registry)" = "https://registry.npmjs.org/"
+          ! grep -E '"resolved": "https?://' package-lock.json | grep -v 'https://registry.npmjs.org/'
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint

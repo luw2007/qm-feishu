@@ -4,6 +4,15 @@
   "description": "Independent Feishu/Lark message surface for QM",
   "type": "module",
   "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luw2007/qm-feishu.git"
+  },
+  "bugs": {
+    "url": "https://github.com/luw2007/qm-feishu/issues"
+  },
+  "homepage": "https://github.com/luw2007/qm-feishu#readme",
   "engines": {
     "node": ">=24"
   },
