@@ -54,6 +54,34 @@ test('decodeReceivedMessage: post flattens title and paragraphs', async () => {
   assert.equal(message.text, '发布通知\n部署已完成 查看详情\n第二行');
 });
 
+test('decodeReceivedMessage: post accepts the legacy multilingual envelope', () => {
+  const message = decodeReceivedMessage({
+    event_id: 'evt_test_post_legacy_1',
+    tenant_key: 'tenant_test_1',
+    sender: {
+      sender_id: { open_id: 'ou_test_sender_4' },
+      sender_type: 'user',
+    },
+    message: {
+      message_id: 'om_test_post_legacy_1',
+      create_time: '1700000003000',
+      chat_id: 'oc_test_group_1',
+      chat_type: 'group',
+      message_type: 'post',
+      content: JSON.stringify({
+        post: {
+          zh_cn: {
+            title: '发布通知',
+            content: [[{ tag: 'text', text: '部署已完成' }]],
+          },
+        },
+      }),
+    },
+  });
+
+  assert.equal(message.text, '发布通知\n部署已完成');
+});
+
 test('decodeReceivedMessage: image carries resource key', async () => {
   const message = decodeReceivedMessage(await fixture('receive-image.json'));
   assert.equal(message.messageType, 'image');

@@ -16,6 +16,6 @@
     "chat_id": "oc_test_group_1",
     "chat_type": "group",
     "message_type": "post",
-    "content": "{\"post\":{\"zh_cn\":{\"title\":\"发布通知\",\"content\":[[{\"tag\":\"text\",\"text\":\"部署已完成 \"},{\"tag\":\"a\",\"text\":\"查看详情\",\"href\":\"https://example.test/report\"}],[{\"tag\":\"text\",\"text\":\"第二行\"}]]}}}"
+    "content": "{\"title\":\"发布通知\",\"content\":[[{\"tag\":\"text\",\"text\":\"部署已完成 \"},{\"tag\":\"a\",\"text\":\"查看详情\",\"href\":\"https://example.test/report\"}],[{\"tag\":\"text\",\"text\":\"第二行\"}],[{\"tag\":\"img\",\"image_key\":\"img_test_embedded_1\",\"width\":640,\"height\":480}]],\"content_v2\":[[{\"tag\":\"text\",\"text\":\"部署已完成 \"},{\"tag\":\"a\",\"text\":\"查看详情\",\"href\":\"https://example.test/report\"}],[{\"tag\":\"text\",\"text\":\"第二行\"}],[{\"tag\":\"img\",\"image_key\":\"img_test_embedded_1\",\"width\":640,\"height\":480}]]}"
   }
 }

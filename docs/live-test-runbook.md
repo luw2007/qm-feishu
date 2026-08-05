@@ -61,6 +61,8 @@ At 2026-08-04T13:53:07Z, the synthetic user confirmed sending standalone text `u
 
 The acceptance OAuth probe did not provide a supported user-send path. Its local per-app user token was deleted. Open Platform retained `offline_access` as an OAuth base grant and accepted a deletion draft for the user identity of `im:message` while preserving the tenant/app grant. App version `1.0.6` remains audited but unpublished; direct lifecycle requests were rejected with platform code `10002`, so no remote version transition is claimed.
 
+On 2026-08-05, two real user events that had failed before intake were correlated through separately authorized, read-only user history metadata: suffix `dda1e2` at 2026-08-05T04:28:55Z and suffix `eaa396` at 2026-08-05T04:31:02Z were both `post` messages, not native `file` or `image` messages. Their receive-side bodies used top-level `{ title, content, content_v2 }`, while the adapter accepted only the send-side multilingual `{ post: { <lang>: ... } }` envelope. The decoder now accepts both structures, and a built-artifact synthetic smoke covered mention text plus an embedded image without routing that image through the native attachment downloader. This does not satisfy the incoming image or generic-file rows; both remain unchecked until a real `message_type=image` or `message_type=file` event stages a QM blob.
+
 ## Local and CI gates
 
 ```sh

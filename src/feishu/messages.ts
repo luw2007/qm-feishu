@@ -55,11 +55,15 @@ function parseContent(content: string): unknown {
 }
 
 function flattenPost(parsed: JsonObject): string {
-  const post = parsed.post;
-  if (!isObject(post)) throw new FeishuDecodeError('invalid_post_content');
-  const langKey = Object.keys(post)[0];
-  const body = langKey !== undefined ? post[langKey] : undefined;
-  if (!isObject(body)) throw new FeishuDecodeError('invalid_post_content');
+  let body: JsonObject = parsed;
+  if (!Array.isArray(parsed.content)) {
+    const post = parsed.post;
+    if (!isObject(post)) throw new FeishuDecodeError('invalid_post_content');
+    const langKey = Object.keys(post)[0];
+    const localized = langKey !== undefined ? post[langKey] : undefined;
+    if (!isObject(localized)) throw new FeishuDecodeError('invalid_post_content');
+    body = localized;
+  }
   const title = typeof body.title === 'string' ? body.title : '';
   const content = Array.isArray(body.content) ? body.content : [];
   const lines = content.map((paragraph) =>
