@@ -44,7 +44,7 @@ Record only a timestamp and the last six characters of a synthetic message/event
 | Outgoing file | Upload and idempotent file message precede delivery ack | PENDING | PENDING | [ ] |
 | Allow once | Matching requester continues once with scope `once` | PENDING | PENDING | [ ] |
 | Deny | Matching requester continues with no approval scope | PENDING | PENDING | [ ] |
-| Absent approval request | Callback fails closed; no continuation | PENDING | PENDING | [ ] |
+| Absent approval request | Callback fails closed; no continuation | 2026-08-05T15:25:50Z | `a96303` | [x] |
 | Non-requester approval | Callback fails closed; no continuation | PENDING | PENDING | [ ] |
 | Proactive principal delivery | Synthetic principal receives one DM; receipt records DM thread | 2026-08-03T12:42:20Z | `618d4c` | [x] |
 | Duplicate event replay | One effective QM turn | PENDING | PENDING | [ ] |
@@ -69,6 +69,12 @@ Feishu attachment messages cannot contain an explicit bot mention. The adapter i
 Real user DM image `13f1af` at 2026-08-05T13:33:23Z completed the same attachment-transfer sequence with the 10 MB image bound: the adapter received the exact `message_type=image` ID, downloaded and staged the image before `intake_outcome=accepted`, acknowledged the delivery, and emitted no decode, intake, acknowledgement, or send failure. The user then saw `Got it, working on it.`, followed by the Docker-daemon error and `The run failed.`; the latter two messages are QM worker execution outcomes after attachment acceptance and do not invalidate image transfer.
 
 Live stop acceptance used an isolated in-memory QM process with `BACKGROUND_WORK_ENABLED=false` so a real user turn remained non-terminal without requiring the unavailable Docker sandbox. The real Feishu WebSocket, source-auth HTTP client, intake handler, and Feishu reply path were unchanged. Real user DM seed `b38a28` at 2026-08-05T14:48:54Z created the sole active run and received acknowledgement `189582`; real user text `stop` (`3ccbdd`) arrived in the same DM root/thread at 2026-08-05T14:49:03Z. The adapter reported `intake_outcome=signaled`, QM retained the same active run ID instead of creating a second run, and Feishu recorded bot receipt `58ad4f` with `Stopped.`. The disabled worker stabilized the observation window; it did not replace any surface boundary under test.
+
+Real user group message `46e1df` at 2026-08-05T15:17:35Z verified the incoming half of topic mapping: Feishu identified one native bot mention and carried verified group root `2e2c26` and thread `8f1bb7`, and the adapter accepted the exact message without decode, intake, or acknowledgement failure. The minimal group-mention-only scope cannot enumerate the resulting app reply, and the adapter did not retain its reply receipt. Code inspection shows `reply_in_thread=true`, but code intent is not live outbound evidence. The matrix row remains unchecked until a fresh real-user topic message yields an observed reply receipt rooted at the same topic.
+
+Live absent-approval rejection passed at 2026-08-05T15:25:50Z using interactive card `a96303` with a synthetic nonexistent request ending `910058`. The real Feishu callback reached the adapter; QM authoritatively returned no approval, every repeated click produced `approval_action_outcome=missing`, and the user saw `This approval request could not be found.` No approval continuation was logged and no active run appeared for the DM thread.
+
+Live ordinary-follow-up verification exposed an upstream contract blocker rather than a pass. On an isolated non-terminal QM, real user seed `8e6eac` and follow-up `84bbf8` were both accepted but created distinct runs. A source-auth differential confirmed pinned QM `7f2c916` forks keyed follow-ups (`sameRun=false`, `steered=false`) while unkeyed follow-ups fold (`sameRun=true`, `steered=true`). The adapter must retain its deterministic message idempotency key, and QM's signal route has no idempotency key; the row remains unchecked until QM provides an atomic idempotent-steer contract.
 
 ## Local and CI gates
 
