@@ -59,7 +59,6 @@ function fakeQm(overrides: Partial<QmPort> = {}): QmPort {
     stageBlob: notImplemented('stageBlob'),
     readBlob: notImplemented('readBlob'),
     readFileArtifact: notImplemented('readFileArtifact'),
-    pushDirectory: notImplemented('pushDirectory'),
     ingestSurfaceEvents: notImplemented('ingestSurfaceEvents'),
     ...overrides,
   };
@@ -100,7 +99,10 @@ function approvalFixture(overrides: Partial<ApprovalView> = {}): ApprovalView {
 function actionFixture(overrides: Partial<NormalizedCardAction> = {}): NormalizedCardAction {
   return {
     eventId: 'evt_test_1',
+    tenantKey: 'tenant_test_1',
+    appId: 'cli_test_app',
     operatorOpenId: 'ou_test_requester_1',
+    operatorTenantKey: 'tenant_test_1',
     requestId: 'req_test_1',
     action: 'allow_once',
     ...overrides,

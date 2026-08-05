@@ -7,6 +7,7 @@ import { renderDeliveryTarget, renderThreadRef, resolveThreadRef } from './threa
 export type IntakeOptions = {
   botOpenId: string;
   tenantKey: string;
+  log?: (event: Record<string, unknown>) => void;
 };
 
 export type IntakeOutcome =
@@ -206,11 +207,20 @@ export async function handleIncomingMessage(
   }
   if ('replayed' in queued) return { kind: 'ignored', reason: 'duplicate' };
 
-  await ports.feishu.reply(message.messageId, {
-    kind: 'text',
-    text: 'Got it, working on it.',
-    uuid: `ack:${message.messageId}`.slice(0, 50),
-  });
+  try {
+    await ports.feishu.reply(message.messageId, {
+      kind: 'text',
+      text: 'Got it, working on it.',
+      uuid: `ack:${message.messageId}`.slice(0, 50),
+    });
+  } catch (error) {
+    options.log?.({
+      event: 'intake_ack_failed',
+      level: 'warn',
+      errorClass: error instanceof Error ? error.name : 'UnknownError',
+      messageId: message.messageId,
+    });
+  }
 
   const threadTs = message.rootId ?? message.threadId;
   const event: SurfaceEvent = {

@@ -112,17 +112,6 @@ export type DeliveryReceipt = {
   messageIds?: string[];
 };
 
-export type DirectoryBatch = {
-  members?: Array<{
-    principalId: string;
-    displayName?: string;
-    active?: boolean;
-  }>;
-  channels?: Array<{
-    id: string;
-    name?: string;
-  }>;
-};
 
 export type SurfaceEvent = {
   container: string;
@@ -194,7 +183,10 @@ export type NormalizedFeishuMessage = {
 
 export type NormalizedCardAction = {
   eventId: string;
+  tenantKey: string;
+  appId: string;
   operatorOpenId: string;
+  operatorTenantKey: string;
   requestId: string;
   action: 'allow_once' | 'allow_session' | 'allow_always' | 'deny';
 };

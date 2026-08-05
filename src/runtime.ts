@@ -70,6 +70,7 @@ function defaultCreateEventSource(config: ResolvedFeishuSurfaceConfig, log: Logg
     appId: config.feishuAppId,
     appSecret: config.feishuAppSecret,
     domain: feishuOpenApiHost(config.feishuBrand),
+    awaitReady: true,
     onEventType: (eventType) => {
       log({ event: 'ws_event_received', level: 'debug', eventType });
     },
@@ -91,7 +92,6 @@ function instrumentDeliveryQm(qm: QmPort, log: Logger, metrics: RuntimeMetrics):
     stageBlob: qm.stageBlob.bind(qm),
     readBlob: qm.readBlob.bind(qm),
     readFileArtifact: qm.readFileArtifact.bind(qm),
-    pushDirectory: qm.pushDirectory.bind(qm),
     ingestSurfaceEvents: qm.ingestSurfaceEvents.bind(qm),
     claimDeliveries: async (type, leaseMs) => {
       const claimed = await qm.claimDeliveries(type, leaseMs);
@@ -207,7 +207,7 @@ export async function runFeishuSurface(config: FeishuSurfaceConfig, deps: Runtim
       outcome = await handleIncomingMessage(
         message,
         { qm, feishu },
-        { botOpenId: resolved.feishuBotOpenId, tenantKey: resolved.feishuTenantKey },
+        { botOpenId: resolved.feishuBotOpenId, tenantKey: resolved.feishuTenantKey, log },
       );
     } catch (error) {
       log({ event: 'intake_failed', level: 'warn', errorClass: errorClassOf(error), messageId: message.messageId });
@@ -226,6 +226,14 @@ export async function runFeishuSurface(config: FeishuSurfaceConfig, deps: Runtim
       action = decodeCardAction(raw);
     } catch (error) {
       log({ event: 'card_action_decode_failed', level: 'warn', errorClass: errorClassOf(error) });
+      return { toast: { type: 'error', content: 'This action could not be processed.' } };
+    }
+    if (
+      action.tenantKey !== resolved.feishuTenantKey ||
+      action.operatorTenantKey !== resolved.feishuTenantKey ||
+      action.appId !== resolved.feishuAppId
+    ) {
+      log({ event: 'card_action_attribution_failed', level: 'warn' });
       return { toast: { type: 'error', content: 'This action could not be processed.' } };
     }
 

@@ -66,6 +66,13 @@ export function resolveConfig(config: FeishuSurfaceConfig): ResolvedFeishuSurfac
     throw new Error('CORE_API_URL must be a valid HTTP or HTTPS URL');
   }
   if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') throw new Error('CORE_API_URL must use HTTP or HTTPS');
+  if (parsedUrl.protocol === 'http:') {
+    const host = parsedUrl.hostname.replace(/^\[|\]$/g, '');
+    const isIpv4Loopback = /^127(?:\.\d{1,3}){3}$/.test(host);
+    if (host !== 'localhost' && host !== '::1' && !isIpv4Loopback) {
+      throw new Error('CORE_API_URL must use HTTPS unless it targets loopback');
+    }
+  }
 
   return {
     coreApiUrl,

@@ -32,13 +32,20 @@ function isCardActionKind(value: unknown): value is CardActionKind {
 export function decodeCardAction(raw: unknown): NormalizedCardAction {
   if (!isObject(raw)) throw new FeishuCardDecodeError('not_an_object');
 
-  const header = isObject(raw.header) ? raw.header : undefined;
-  const eventId = nonEmptyString(header?.event_id) ? header.event_id : nonEmptyString(raw.event_id) ? raw.event_id : undefined;
+  const header = isObject(raw.header) ? raw.header : raw;
+  const eventId = nonEmptyString(header.event_id) ? header.event_id : undefined;
   if (!eventId) throw new FeishuCardDecodeError('missing_event_id');
+  const tenantKey = nonEmptyString(header.tenant_key) ? header.tenant_key : undefined;
+  if (!tenantKey) throw new FeishuCardDecodeError('missing_tenant_key');
+  const appId = nonEmptyString(header.app_id) ? header.app_id : undefined;
+  if (!appId) throw new FeishuCardDecodeError('missing_app_id');
 
   const body = isObject(raw.event) ? raw.event : raw;
-  const operatorOpenId = isObject(body.operator) && nonEmptyString(body.operator.open_id) ? body.operator.open_id : undefined;
+  const operator = isObject(body.operator) ? body.operator : undefined;
+  const operatorOpenId = nonEmptyString(operator?.open_id) ? operator.open_id : undefined;
   if (!operatorOpenId) throw new FeishuCardDecodeError('missing_verified_operator');
+  const operatorTenantKey = nonEmptyString(operator?.tenant_key) ? operator.tenant_key : undefined;
+  if (!operatorTenantKey) throw new FeishuCardDecodeError('missing_operator_tenant_key');
 
   const value = isObject(body.action) ? body.action.value : undefined;
   if (!isObject(value) || !nonEmptyString(value.requestId)) throw new FeishuCardDecodeError('missing_request_id');
@@ -46,7 +53,10 @@ export function decodeCardAction(raw: unknown): NormalizedCardAction {
 
   return {
     eventId,
+    tenantKey,
+    appId,
     operatorOpenId,
+    operatorTenantKey,
     requestId: value.requestId,
     action: value.action,
   };

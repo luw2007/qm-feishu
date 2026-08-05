@@ -55,6 +55,18 @@ void test('resolveConfig reports a stable error for a malformed core API URL', (
   assert.throws(() => resolveConfig(validConfig({ coreApiUrl: 'not a url' })), /CORE_API_URL must be a valid HTTP or HTTPS URL/);
 });
 
+void test('resolveConfig rejects plaintext QM URLs outside loopback', () => {
+  for (const coreApiUrl of ['http://qm.internal:18080', 'http://10.0.0.1:18080', 'http://[2001:db8::1]:18080']) {
+    assert.throws(() => resolveConfig(validConfig({ coreApiUrl })), /HTTPS|loopback/);
+  }
+});
+
+void test('resolveConfig allows plaintext QM URLs on loopback only', () => {
+  for (const coreApiUrl of ['http://localhost:18080', 'http://127.0.0.2:18080', 'http://[::1]:18080']) {
+    assert.equal(resolveConfig(validConfig({ coreApiUrl })).coreApiUrl, coreApiUrl);
+  }
+});
+
 void test('resolveConfig applies documented defaults for optional fields', () => {
   const resolved = resolveConfig(validConfig());
   assert.equal(resolved.claimPrincipalDeliveries, false);

@@ -71,7 +71,6 @@ function fakeQm(overrides: Partial<QmPort> = {}): QmPort {
     readFileArtifact: async () => {
       throw new Error('not implemented');
     },
-    pushDirectory: async () => undefined,
     ingestSurfaceEvents: async () => undefined,
     ...overrides,
   };
@@ -182,7 +181,7 @@ function cardActionFixture(overrides: Record<string, unknown> = {}): unknown {
       create_time: '1700000006000',
       event_type: 'card.action.trigger',
       tenant_key: 'tenant_test_1',
-      app_id: 'cli_test_1',
+      app_id: 'cli_test_app',
     },
     event: {
       operator: { open_id: 'ou_test_operator_1', tenant_key: 'tenant_test_1' },
@@ -223,6 +222,37 @@ void test('startup probes QM then Feishu then starts the event source, in order'
   const handle = await runFeishuSurface(testConfig(), deps);
   try {
     assert.deepEqual(order, ['qm_probe', 'feishu_probe', 'event_source_start']);
+  } finally {
+    await handle.stop();
+  }
+});
+
+void test('readiness stays unavailable until the event source confirms startup', async () => {
+  const started = deferred<void>();
+  let startCalls = 0;
+  const eventSource = controllableEventSource();
+  const withPort = await withHealthPort({
+    createQmClient: () => fakeQm(),
+    createFeishuClient: () => fakeFeishu(),
+    createEventSource: () => ({
+      start: async (handlers) => {
+        startCalls += 1;
+        await eventSource.source.start(handlers);
+        await started.promise;
+      },
+      stop: eventSource.source.stop.bind(eventSource.source),
+    }),
+  });
+
+  const pending = runFeishuSurface(testConfig(), withPort.deps);
+  await waitFor(() => startCalls === 1);
+  const base = `http://127.0.0.1:${withPort.port()}`;
+  assert.equal((await fetch(`${base}/readyz`)).status, 503);
+
+  started.resolve();
+  const handle = await pending;
+  try {
+    assert.equal((await fetch(`${base}/readyz`)).status, 200);
   } finally {
     await handle.stop();
   }
@@ -441,6 +471,46 @@ void test('an accepted intake submits the decoded turn, acks the message, and st
   }
 });
 
+void test('an accepted intake with a failed acknowledgement still starts its approval watch', async () => {
+  const eventSource = controllableEventSource();
+  let pendingCalls = 0;
+  let cardSends = 0;
+  const { log, events } = captureLog();
+  const deps: RuntimeDeps = {
+    createQmClient: () => fakeQm({
+      submitTurn: async () => ({ runId: 'run_ack_failed_1', queued: true, steered: false }),
+      pendingApproval: async () => {
+        pendingCalls += 1;
+        return {
+          requestId: 'req_ack_failed_1',
+          status: 'pending',
+          grantModes: { once: true, session: false, always: false },
+        };
+      },
+    }),
+    createFeishuClient: () => fakeFeishu({
+      reply: async () => { throw new Error('sensitive Feishu failure'); },
+      send: async () => {
+        cardSends += 1;
+        return { messageId: 'om_test_ack_failed_card_1' };
+      },
+    }),
+    createEventSource: () => eventSource.source,
+    log,
+  };
+
+  const handle = await runFeishuSurface(testConfig(), deps);
+  try {
+    await eventSource.emitMessage(messageFixture());
+    await waitFor(() => cardSends === 1);
+    assert.equal(pendingCalls, 1);
+    assert.ok(events.some((event) => event.event === 'intake_ack_failed' && event.errorClass === 'Error'));
+    assert.equal(JSON.stringify(events).includes('sensitive Feishu failure'), false);
+  } finally {
+    await handle.stop();
+  }
+});
+
 void test('a card action after restart reconstructs continuation context, waits for queue acceptance, and re-arms a chained watch', async () => {
   const eventSource = controllableEventSource();
   const continuationTurns: unknown[] = [];
@@ -646,6 +716,41 @@ void test('an unrecognized card action responds with an error toast instead of t
   try {
     const response = await eventSource.emitCardAction(cardActionFixture());
     assert.deepEqual(response, { toast: { type: 'error', content: 'This approval request could not be found.' } });
+  } finally {
+    await handle.stop();
+  }
+});
+
+void test('card actions with foreign or missing tenant attribution fail before QM lookup', async () => {
+  const eventSource = controllableEventSource();
+  let approvalLookups = 0;
+  let submissions = 0;
+  const deps: RuntimeDeps = {
+    createQmClient: () => fakeQm({
+      getApproval: async () => {
+        approvalLookups += 1;
+        return null;
+      },
+      submitTurn: async () => {
+        submissions += 1;
+        return { runId: 'run_unexpected_1', queued: true };
+      },
+    }),
+    createFeishuClient: () => fakeFeishu(),
+    createEventSource: () => eventSource.source,
+  };
+  const handle = await runFeishuSurface(testConfig(), deps);
+  try {
+    const cases = [
+      cardActionFixture({ header: { event_id: 'evt_foreign_tenant', tenant_key: 'tenant_foreign', app_id: 'cli_test_app' } }),
+      cardActionFixture({ header: { event_id: 'evt_foreign_app', tenant_key: 'tenant_test_1', app_id: 'cli_foreign' } }),
+      cardActionFixture({ event: { operator: { open_id: 'ou_test_operator_1', tenant_key: 'tenant_foreign' }, action: { value: { requestId: 'req_test_1', action: 'allow_once' } } } }),
+    ];
+    for (const raw of cases) {
+      assert.deepEqual(await eventSource.emitCardAction(raw), { toast: { type: 'error', content: 'This action could not be processed.' } });
+    }
+    assert.equal(approvalLookups, 0);
+    assert.equal(submissions, 0);
   } finally {
     await handle.stop();
   }
