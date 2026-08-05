@@ -29,6 +29,13 @@ test(`QM source-auth contract at revision ${QM_REVISION}`, { skip: skipReason },
     assert.equal(await new Response(await client.readBlob(staged.blobId)).text(), 'qm-feishu-contract');
   });
 
+  await t.test('empty thread and approval lookups preserve null and 404 semantics', async () => {
+    const nonce = Date.now();
+    assert.equal(await client.activeRun(`feishu:dm:oc_missing_${nonce}`), undefined);
+    assert.equal(await client.pendingApproval(`feishu:dm:oc_missing_${nonce}`), null);
+    assert.equal(await client.getApproval(`approval_missing_${nonce}`), null);
+  });
+
   await t.test('async Feishu turn preserves the external protocol fields', async () => {
     const queued = await client.submitTurn({
       text: 'qm-feishu contract turn',
@@ -82,5 +89,24 @@ test(`QM source-auth contract at revision ${QM_REVISION}`, { skip: skipReason },
 
   await t.test('delivery claim route is source authenticated', async () => {
     assert.ok(Array.isArray(await client.claimDeliveries('feishu', 1_000)));
+  });
+
+  await t.test('acknowledgement recovery routes are idempotent for unknown identifiers', async () => {
+    const nonce = Date.now();
+    await client.ackDelivery(`delivery_missing_${nonce}`);
+    await client.ackDeliveryByKey(`delivery-key-missing-${nonce}`);
+  });
+
+  await t.test('surface-cache ingestion accepts the Feishu event shape', async () => {
+    const nonce = String(Date.now());
+    await client.ingestSurfaceEvents([
+      {
+        container: `oc_contract_${nonce}`,
+        ts: nonce,
+        actorId: 'ou_test_contract',
+        text: 'contract event',
+        files: [{ fileId: `file_contract_${nonce}`, name: 'contract.txt', mediaType: 'text/plain' }],
+      },
+    ]);
   });
 });

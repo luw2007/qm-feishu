@@ -31,7 +31,7 @@
   "scripts": {
     "start": "node dist/main.js",
     "setup": "node dist/setup-main.js",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node --eval \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "node --import tsx --test 'test/**/*.test.ts'",

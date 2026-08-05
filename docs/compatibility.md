@@ -11,6 +11,8 @@
 
 The adapter treats QM's source-authenticated HTTP routes as an observed external contract, not a stable upstream SDK. Compatibility CI must run against the exact QM revision above before release. A QM upgrade requires rerunning `npm run test:qm-contract` and the live matrix in `docs/live-test-runbook.md` before updating this table.
 
+Automated compatibility covers health, blob upload/read, asynchronous turn submission and terminal replay, run lookup, empty active-run lookup, empty approval lookup, delivery claim, idempotent delivery acknowledgement routes, and Feishu surface-cache ingestion. Run signal, present approval records, delivery payload decoding with real queued output, and file-artifact reads require deterministic upstream state that the external contract harness cannot create; those paths remain covered by local decoder/unit tests and the live matrix rather than synthetic green integration cases.
+
 Required Feishu capabilities:
 
 - bot enabled;

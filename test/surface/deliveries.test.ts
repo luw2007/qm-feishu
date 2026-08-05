@@ -47,7 +47,6 @@ function fakeQm(overrides: Partial<QmPort> = {}): QmPort {
     readFileArtifact: async () => {
       throw new Error('not implemented');
     },
-    pushDirectory: async () => undefined,
     ingestSurfaceEvents: async () => undefined,
     ...overrides,
   };

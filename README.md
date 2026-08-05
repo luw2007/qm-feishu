@@ -60,7 +60,7 @@ To configure an existing application, set `FEISHU_APP_ID` and `FEISHU_APP_SECRET
 
 Required environment variables:
 
-- `CORE_API_URL`
+- `CORE_API_URL` — QM endpoint. Remote endpoints must use HTTPS; plaintext HTTP is accepted only for `localhost`, `127.0.0.0/8`, and `::1`.
 - `CORE_SIGNING_SECRET` (at least 32 characters)
 - `FEISHU_APP_ID`
 - `FEISHU_APP_SECRET`
@@ -84,7 +84,7 @@ See `.env.example` for a synthetic local configuration.
 The runtime exposes two unauthenticated HTTP endpoints on `HEALTH_HOST:HEALTH_PORT`; neither returns secrets or tenant data:
 
 - `GET /healthz` — liveness. Returns `200` once the process has started.
-- `GET /readyz` — readiness. Returns `200` only while QM and Feishu connectivity are both confirmed; returns a non-`200` status otherwise so the deployment platform can hold traffic.
+- `GET /readyz` — readiness. Returns `200` only while QM, Feishu OpenAPI, and the Feishu WebSocket long connection are confirmed and delivery polling succeeds; returns a non-`200` status otherwise so the deployment platform can hold traffic.
 - `GET /metrics` — process-local JSON counters: claimed-but-unacknowledged delivery backlog, claims, observed lease reclaims, terminal dispositions, and approval-watcher outcomes. These are adapter-process counters, not QM's global queue state.
 
 On `SIGTERM` or `SIGINT`, the process stops accepting new event intake, approval watches, and delivery claims, then waits for active sends to finish, bounded by `FEISHU_SHUTDOWN_TIMEOUT_MS`, before exiting. Deliveries not yet acknowledged before shutdown remain durably claimable in QM after the lease expires.

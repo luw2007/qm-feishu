@@ -17,10 +17,10 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: npm
@@ -39,23 +39,24 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
-      - uses: gitleaks/gitleaks-action@v2
+      - run: npm audit --omit=dev --audit-level=high
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   qm-contract:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: yc-software/qm
           ref: 7f2c916360f1797a8ff2a77ce2ce40c5fabab087
           path: qm-reference
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: npm
@@ -75,7 +76,7 @@ jobs:
           CORE_SIGNING_SECRET="$QM_CONTRACT_SIGNING_SECRET" \
           HARNESS=mock \
           HARNESS_SECURITY_POSTURE=dangerous \
-          BACKGROUND_WORK_ENABLED=0 \
+          BACKGROUND_WORK_ENABLED=1 \
           SEED_SKILLS=0 \
           DATA_DIR="$RUNNER_TEMP/qm-contract" \
             npm --prefix qm-reference start >"$RUNNER_TEMP/qm-contract.log" 2>&1 &
@@ -103,22 +104,66 @@ jobs:
       contents: write
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push immutable image
-        id: image
-        uses: docker/build-push-action@v6
+      - name: Build candidate image once
+        run: docker build -t qm-feishu:candidate .
+      - name: Inspect candidate image
+        run: |
+          test "$(docker run --rm qm-feishu:candidate node -e 'console.log(process.getuid())')" != "0"
+          docker create --name qm-feishu-inspect qm-feishu:candidate
+          docker export qm-feishu-inspect | tar -tf - > "$RUNNER_TEMP/image-files.txt"
+          docker rm -f qm-feishu-inspect
+          grep -q '^app/dist/main.js$' "$RUNNER_TEMP/image-files.txt"
+          grep -q '^app/package.json$' "$RUNNER_TEMP/image-files.txt"
+          grep -q '^app/LICENSE$' "$RUNNER_TEMP/image-files.txt"
+          ! grep -E '^app/(src|test|docs|fixtures)/' "$RUNNER_TEMP/image-files.txt"
+          ! grep -E '^app/\.env($|\.)' "$RUNNER_TEMP/image-files.txt"
+      - name: Smoke candidate lifecycle
+        run: |
+          docker run -d --name qm-feishu-smoke \
+            -e CORE_API_URL=http://127.0.0.1:18080 \
+            -e CORE_SIGNING_SECRET=release-only-synthetic-secret-00000001 \
+            -e FEISHU_APP_ID=cli_release_test_app \
+            -e FEISHU_APP_SECRET=release-only-synthetic-app-secret \
+            -e FEISHU_BOT_OPEN_ID=ou_release_test_bot \
+            -e FEISHU_TENANT_KEY=tenant_release_test \
+            -e CORE_REQUEST_TIMEOUT_MS=100 \
+            -p 3000:3000 qm-feishu:candidate
+          trap 'docker rm -f qm-feishu-smoke 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 15); do
+            curl -fsS http://127.0.0.1:3000/healthz && break
+            test "$attempt" != "15"
+            sleep 2
+          done
+          test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/readyz)" = "503"
+          docker stop --time 20 qm-feishu-smoke
+          test "$(docker inspect qm-feishu-smoke --format '{{.State.ExitCode}}')" = "0"
+      - name: Scan candidate image
+        uses: aquasecurity/trivy-action@ea165f8d65b6e75b540449e92b4886f43607fa02 # 0.33.1
         with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/luw2007/qm-feishu:${{ needs.verify.outputs.version }}
-            ghcr.io/luw2007/qm-feishu:${{ github.sha }}
+          image-ref: qm-feishu:candidate
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Push verified candidate
+        id: image
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          version_tag="ghcr.io/luw2007/qm-feishu:${VERSION}"
+          sha_tag="ghcr.io/luw2007/qm-feishu:${GITHUB_SHA}"
+          docker tag qm-feishu:candidate "$version_tag"
+          docker tag qm-feishu:candidate "$sha_tag"
+          docker push "$version_tag"
+          docker push "$sha_tag"
+          digest="$(docker inspect --format='{{index .RepoDigests 0}}' "$version_tag" | cut -d@ -f2)"
+          test -n "$digest"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

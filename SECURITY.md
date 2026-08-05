@@ -10,6 +10,8 @@ Supported releases and their QM compatibility envelope are listed in `docs/compa
 
 Every request to QM is signed with `CORE_SIGNING_SECRET` (HMAC-SHA256 over method, path, timestamp, and body) and carries a fresh timestamp; QM independently verifies the signature and rejects stale or unsigned requests. The signing secret is never logged, never sent to Feishu, and is the only credential that authorizes this adapter to act against QM.
 
+Remote QM endpoints must use HTTPS because HMAC authenticates requests but does not encrypt message or file content. Plaintext `CORE_API_URL` values are accepted only for loopback development and same-machine deployments.
+
 ### Callback authenticity
 
 `card.action.trigger` callbacks are never trusted for identity or authority. Card payloads bind only a request ID and an action; the adapter always reloads the current approval from QM and compares the verified callback's `operator.open_id` against `record.request.actor.externalId`. A missing originating request, a missing actor, or a mismatch always denies the action and returns a cannot-verify-requester toast — the callback is never authorized from its embedded value or from adapter-local state.

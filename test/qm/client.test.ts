@@ -67,7 +67,6 @@ test('QmHttpClient structurally satisfies QmPort and constructs every JSON route
         json({ ok: true }),
         json({ ok: true }),
         json({ pending: null }),
-        json({ ok: true, members: 1, channels: 1 }),
         json({ ok: true, upserted: 1 }),
       ],
       calls,
@@ -83,10 +82,6 @@ test('QmHttpClient structurally satisfies QmPort and constructs every JSON route
   await client.ackDelivery('delivery/test % 1', { threadRef: 'feishu:dm:oc_test_1', messageIds: ['om_test_2'] });
   await client.ackDeliveryByKey('key / 100%');
   await client.pendingApproval('feishu:dm:oc_test_1');
-  await client.pushDirectory({
-    members: [{ principalId: 'ou_test_1', displayName: 'Test User', active: true }],
-    channels: [{ id: 'oc_test_1', name: 'Test Group' }],
-  });
   await client.ingestSurfaceEvents([
     {
       container: 'oc_test_1',
@@ -110,7 +105,6 @@ test('QmHttpClient structurally satisfies QmPort and constructs every JSON route
       ['/v1/deliveries/delivery%2Ftest%20%25%201/ack', 'POST'],
       ['/v1/deliveries/ack-by-key', 'POST'],
       ['/v1/approvals/pending?threadRef=feishu%3Adm%3Aoc_test_1', 'GET'],
-      ['/v1/directory', 'POST'],
       ['/v1/surface-cache/ingest', 'POST'],
     ],
   );
@@ -136,10 +130,6 @@ test('QmHttpClient structurally satisfies QmPort and constructs every JSON route
   });
   assert.deepEqual(JSON.parse(String(calls[6]!.init.body)), { recipientThreadRef: 'feishu:dm:oc_test_1' });
   assert.deepEqual(JSON.parse(String(calls[9]!.init.body)), {
-    members: [{ principalId: 'ou_test_1', displayName: 'Test User', type: 'internal' }],
-    channels: [{ channelId: 'oc_test_1', name: 'Test Group' }],
-  });
-  assert.deepEqual(JSON.parse(String(calls[10]!.init.body)), {
     surface: 'feishu',
     events: [
       {

@@ -6,7 +6,6 @@ import type {
   BlobRef,
   Delivery,
   DeliveryReceipt,
-  DirectoryBatch,
   IncomingFile,
   TurnSubmission,
   RunView,
@@ -327,29 +326,6 @@ export class QmHttpClient implements QmPort {
     const response = await this.#request('GET', path);
     if (!response.body) throw new QmContractError();
     return response.body;
-  }
-
-  async pushDirectory(batch: DirectoryBatch): Promise<void> {
-    const body = {
-      ...(batch.members
-        ? {
-            members: batch.members.map((member) => ({
-              principalId: member.principalId,
-              displayName: member.displayName ?? member.principalId,
-              type: 'internal',
-            })),
-          }
-        : {}),
-      ...(batch.channels
-        ? {
-            channels: batch.channels.map((channel) => ({
-              channelId: channel.id,
-              name: channel.name ?? channel.id,
-            })),
-          }
-        : {}),
-    };
-    decodeOk(await this.#json('POST', '/v1/directory', body));
   }
 
   async ingestSurfaceEvents(events: SurfaceEvent[]): Promise<void> {

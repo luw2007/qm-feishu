@@ -3,7 +3,6 @@ import type {
   BlobRef,
   Delivery,
   DeliveryReceipt,
-  DirectoryBatch,
   FeishuResourceKey,
   FeishuTarget,
   IncomingFile,
@@ -31,7 +30,6 @@ export interface QmPort {
   stageBlob(file: IncomingFile): Promise<BlobRef>;
   readBlob(blobId: string): Promise<ReadableStream<Uint8Array>>;
   readFileArtifact(artifactId: string, viewerId: string): Promise<ReadableStream<Uint8Array>>;
-  pushDirectory(batch: DirectoryBatch): Promise<void>;
   ingestSurfaceEvents(events: SurfaceEvent[]): Promise<void>;
 }
 

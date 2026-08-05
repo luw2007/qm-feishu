@@ -90,7 +90,6 @@ function fakeQm(
     stageBlob: notImplemented('stageBlob'),
     readBlob: notImplemented('readBlob'),
     readFileArtifact: notImplemented('readFileArtifact'),
-    pushDirectory: notImplemented('pushDirectory'),
     ingestSurfaceEvents: async (events) => {
       calls.ingestSurfaceEvents.push(events);
       order.push('ingestSurfaceEvents');

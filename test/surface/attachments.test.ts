@@ -103,7 +103,6 @@ function fakeIntakeQm(): { port: QmPort; calls: IntakeQmCalls } {
     },
     readBlob: notImplemented('readBlob'),
     readFileArtifact: notImplemented('readFileArtifact'),
-    pushDirectory: notImplemented('pushDirectory'),
     ingestSurfaceEvents: async () => undefined,
   };
   return { port, calls };
@@ -285,7 +284,6 @@ function fakeDeliveryQm(overrides: Partial<QmPort> = {}): QmPort {
     stageBlob: notImplemented('stageBlob'),
     readBlob: notImplemented('readBlob'),
     readFileArtifact: notImplemented('readFileArtifact'),
-    pushDirectory: async () => undefined,
     ingestSurfaceEvents: async () => undefined,
     ...overrides,
   };
