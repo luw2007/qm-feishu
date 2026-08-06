@@ -42,8 +42,8 @@ Record only a timestamp and the last six characters of a synthetic message/event
 | Incoming image in bot DM | Standalone image stages a blob with digest and metadata | 2026-08-05T13:33:23Z | `13f1af` | [x] |
 | Incoming generic file in bot DM | Standalone file stages a blob with filename/media metadata | 2026-08-05T08:20:41Z | `576d47` | [x] |
 | Outgoing file | Upload and idempotent file message precede delivery ack | PENDING | PENDING | [ ] |
-| Allow once | Matching requester continues once with scope `once` | PENDING | PENDING | [ ] |
-| Deny | Matching requester continues with no approval scope | PENDING | PENDING | [ ] |
+| Allow once | Matching requester continues once with scope `once` | 2026-08-06T03:04:45Z | `723c58` | [x] |
+| Deny | Matching requester continues with no approval scope | 2026-08-06T03:26:12Z | `770fcd` | [x] |
 | Absent approval request | Callback fails closed; no continuation | 2026-08-05T15:25:50Z | `a96303` | [x] |
 | Non-requester approval | Callback fails closed; no continuation | PENDING | PENDING | [ ] |
 | Proactive principal delivery | Synthetic principal receives one DM; receipt records DM thread | 2026-08-03T12:42:20Z | `618d4c` | [x] |
@@ -73,6 +73,10 @@ Live stop acceptance used an isolated in-memory QM process with `BACKGROUND_WORK
 Real user group message `46e1df` at 2026-08-05T15:17:35Z verified the incoming half of topic mapping: Feishu identified one native bot mention and carried verified group root `2e2c26` and thread `8f1bb7`, and the adapter accepted the exact message without decode, intake, or acknowledgement failure. The minimal group-mention-only scope cannot enumerate the resulting app reply, and the adapter did not retain its reply receipt. Code inspection shows `reply_in_thread=true`, but code intent is not live outbound evidence. The matrix row remains unchecked until a fresh real-user topic message yields an observed reply receipt rooted at the same topic.
 
 Live absent-approval rejection passed at 2026-08-05T15:25:50Z using interactive card `a96303` with a synthetic nonexistent request ending `910058`. The real Feishu callback reached the adapter; QM authoritatively returned no approval, every repeated click produced `approval_action_outcome=missing`, and the user saw `This approval request could not be found.` No approval continuation was logged and no active run appeared for the DM thread.
+
+Live allow-once acceptance passed at 2026-08-06T03:04:45Z for interactive card `723c58` and QM approval request `d85f58`. Pinned QM's built-in deterministic mock harness created the authoritative pending approval through a source-authenticated turn without Docker; its stored requester matched the real synthetic Feishu user and granted `once`. The real card callback passed verified-operator checks, reloaded that QM record, submitted the production continuation with scope `once`, and reported `approval_action_outcome=accepted`. QM then returned the approval as missing; a repeated click also returned missing rather than continuing twice.
+
+Live deny acceptance passed at 2026-08-06T03:26:12Z for interactive card `770fcd` and a separate authoritative QM request ending `748399`. The real callback passed requester verification, submitted the production denial continuation with `approved=false` and no approval scope, and reported `approval_action_outcome=denied`. QM then returned the approval as missing, no active run remained, and repeated clicks returned missing rather than submitting another continuation.
 
 Live ordinary-follow-up verification exposed an upstream contract blocker rather than a pass. On an isolated non-terminal QM, real user seed `8e6eac` and follow-up `84bbf8` were both accepted but created distinct runs. A source-auth differential confirmed pinned QM `7f2c916` forks keyed follow-ups (`sameRun=false`, `steered=false`) while unkeyed follow-ups fold (`sameRun=true`, `steered=true`). The adapter must retain its deterministic message idempotency key, and QM's signal route has no idempotency key; the row remains unchecked until QM provides an atomic idempotent-steer contract.
 
