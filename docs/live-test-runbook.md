@@ -47,14 +47,14 @@ Record only a timestamp and the last six characters of a synthetic message/event
 | Absent approval request | Callback fails closed; no continuation | 2026-08-05T15:25:50Z | `a96303` | [x] |
 | Non-requester approval | Callback fails closed; no continuation | 2026-08-06 | `N/A` | WAIVED |
 | Proactive principal delivery | Synthetic principal receives one DM; receipt records DM thread | 2026-08-03T12:42:20Z | `618d4c` | [x] |
-| Duplicate event replay | One effective QM turn | PENDING | PENDING | [ ] |
+| Duplicate event replay | One effective QM turn | 2026-08-06 | `N/A` | WAIVED |
 | Transient Feishu send failure | Delivery remains unacked, recovers after lease, UUID remains stable | 2026-08-03T14:27:17Z | `b081b0` | [x] |
 | QM unavailable then recovers | Liveness stays `200`; readiness moves `503` to `200` | 2026-08-03T12:34:02Z | `N/A` | [x] |
 | SIGTERM during active work | Intake stops and process exits within configured deadline | 2026-08-03T12:34:02Z | `N/A` | [x] |
 
 ## Release decisions
 
-For `v0.1.0`, the release owner explicitly waived live verification of a true user topic follow-up and a non-requester approval click on 2026-08-06. These rows are not test passes. The release owner also accepted pinned QM `7f2c916`'s active-run steer limitation: deterministic per-message idempotency preserves replay safety but causes an ordinary follow-up to create a distinct run instead of steering the active run. The adapter does not remove idempotency or inject a non-idempotent signal to conceal that upstream limitation. These three decisions remove only their named live gates from `v0.1.0`; they do not change the implementation or its tested behavior.
+For `v0.1.0`, the release owner explicitly waived live verification of a true user topic follow-up, a non-requester approval click, and a real Feishu duplicate-event replay on 2026-08-06. These rows are not test passes. The release owner also accepted pinned QM `7f2c916`'s active-run steer limitation: deterministic per-message idempotency preserves replay safety but causes an ordinary follow-up to create a distinct run instead of steering the active run. The adapter does not remove idempotency or inject a non-idempotent signal to conceal that upstream limitation. The duplicate-event waiver does not replace the existing automated coverage for stable `feishu:message:<message_id>` keys and suppression of completed QM replays; it waives only the unavailable live Feishu redelivery observation. These decisions remove only their named live gates from `v0.1.0`; they do not change the implementation or its tested behavior.
 
 ## Current environment blockers
 
