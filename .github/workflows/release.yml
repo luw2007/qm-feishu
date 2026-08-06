@@ -32,9 +32,10 @@ jobs:
           version="$(node -p "require('./package.json').version")"
           test "$RELEASE_TAG" = "v$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          ! grep -q 'PENDING' docs/live-test-runbook.md
-          ! grep -q '\[ \]' docs/live-test-runbook.md
+          ! grep -q 'PENDING' docs/03-workflows/release-verification.md
+          ! grep -q '\[ \]' docs/03-workflows/release-verification.md
       - run: npm ci
+      - run: npm run docs:check
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
@@ -172,4 +173,4 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --title "${{ github.ref_name }}" \
             --notes "Container: ghcr.io/luw2007/qm-feishu:${{ needs.verify.outputs.version }}@${IMAGE_DIGEST}" \
-            docs/compatibility.md docs/live-test-runbook.md
+            docs/01-architecture/compatibility.md docs/03-workflows/release-verification.md

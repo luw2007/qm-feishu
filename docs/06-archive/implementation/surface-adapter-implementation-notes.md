@@ -1,3 +1,15 @@
+> 治理版本：2
+> 事实状态：n/a
+> 生命周期：historical
+> 实施状态：completed
+> SSOT 同步：synced
+> 对应事实源：docs/01-architecture/project-architecture.md, docs/03-workflows/release-verification.md
+> 替代关系：稳定事实已提取到当前 SSOT
+> 最后复核时间：2026-08-06
+> 归档原因：实施过程日志已结束，仅用于追溯决策和证据
+> 原始路径：docs/logs/implementation-notes-surface-adapter.md
+> 归档时间：2026-08-06
+
 # Surface adapter implementation notes
 
 - The adapter targets Node 24.18.0 locally because the workstation default Node 22 cannot satisfy the approved Node 24 engine gate.

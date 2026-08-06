@@ -19,4 +19,4 @@ Describe the user-visible change and its boundary.
 
 ## Release evidence
 
-- [ ] Not applicable, or evidence comes from this exact commit and is redacted according to `docs/live-test-runbook.md`.
+- [ ] Not applicable, or evidence comes from this exact commit and is redacted according to `docs/03-workflows/release-verification.md`.

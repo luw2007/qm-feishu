@@ -1,3 +1,15 @@
+> 治理版本：2
+> 事实状态：n/a
+> 生命周期：historical
+> 实施状态：completed
+> SSOT 同步：synced
+> 对应事实源：docs/01-architecture/project-architecture.md
+> 替代关系：由 docs/01-architecture/project-architecture.md 替代
+> 最后复核时间：2026-08-06
+> 归档原因：设计已实施；历史方案含已删除能力和过期接口，仅用于追溯
+> 原始路径：docs/superpowers/specs/2026-08-03-qm-feishu-design.md
+> 归档时间：2026-08-06
+
 # qm-feishu Design
 
 Date: 2026-08-03

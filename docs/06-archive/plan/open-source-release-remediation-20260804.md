@@ -1,3 +1,15 @@
+> 治理版本：2
+> 事实状态：n/a
+> 生命周期：historical
+> 实施状态：completed
+> SSOT 同步：synced
+> 对应事实源：docs/01-architecture/project-architecture.md, docs/03-workflows/release-verification.md
+> 替代关系：当前事实由架构与发布验证 SSOT 替代
+> 最后复核时间：2026-08-06
+> 归档原因：修复计划已完成，不再参与当前执行
+> 原始路径：docs/plans/qm-feishu-20260804-open-source-release-remediation.md
+> 归档时间：2026-08-06
+
 # qm-feishu open-source release remediation plan
 
 ## Accepted requirements

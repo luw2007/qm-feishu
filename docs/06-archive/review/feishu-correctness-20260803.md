@@ -1,3 +1,15 @@
+> 治理版本：2
+> 事实状态：n/a
+> 生命周期：historical
+> 实施状态：n/a
+> SSOT 同步：synced
+> 对应事实源：docs/01-architecture/project-architecture.md
+> 替代关系：缺陷处置状态见当前架构的已知缺口
+> 最后复核时间：2026-08-06
+> 归档原因：专项评审已结束，多数发现已修复或随能力删除失效
+> 原始路径：docs/logs/review-feishu-correctness-20260803.md
+> 归档时间：2026-08-06
+
 # Feishu adapter correctness review (2026-08-03)
 
 Read-only review of `src/feishu/*.ts`, `test/feishu/*.test.ts`, `test/fixtures/feishu/*.json` against

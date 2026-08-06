@@ -1,3 +1,15 @@
+> 治理版本：2
+> 事实状态：n/a
+> 生命周期：historical
+> 实施状态：completed
+> SSOT 同步：synced
+> 对应事实源：docs/01-architecture/project-architecture.md, docs/03-workflows/release-verification.md
+> 替代关系：当前事实由架构与发布验证 SSOT 替代
+> 最后复核时间：2026-08-06
+> 归档原因：设计已实施，不再作为当前事实源
+> 原始路径：docs/superpowers/specs/2026-08-04-open-source-release-remediation-design.md
+> 归档时间：2026-08-06
+
 # Open-source and release remediation design
 
 ## Goal

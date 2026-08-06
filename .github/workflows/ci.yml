@@ -24,6 +24,7 @@ jobs:
           test "$(npm config get registry)" = "https://registry.npmjs.org/"
           ! grep -E '"resolved": "https?://' package-lock.json | grep -v 'https://registry.npmjs.org/'
       - run: npm ci
+      - run: npm run docs:check
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test

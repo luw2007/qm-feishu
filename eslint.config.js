@@ -19,6 +19,10 @@ export default tseslint.config(
     },
   },
   {
+    files: ['scripts/**/*.mjs'],
+    extends: [tseslint.configs.disableTypeChecked],
+  },
+  {
     files: ['src/surface/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', {

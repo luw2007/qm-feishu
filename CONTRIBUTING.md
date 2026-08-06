@@ -34,6 +34,6 @@ Do not commit `.env`, credentials, production payloads, tenant data, generated `
 
 Keep changes focused and follow existing TypeScript style. Add a behavioral test for every new contract or bug fix. Explain user-visible behavior, security impact, and verification commands in the pull request.
 
-Changes to QM HTTP routes or response decoding must update the pinned contract suite and `docs/compatibility.md`. Never import, vendor, symlink, or add a file dependency on QM source.
+Changes to QM HTTP routes or response decoding must update the pinned contract suite and `docs/01-architecture/compatibility.md`. Never import, vendor, symlink, or add a file dependency on QM source.
 
 Release evidence must come from the exact candidate commit. Do not mark a live scenario passed without a real dedicated-tenant observation and redacted evidence.

@@ -1,3 +1,15 @@
+> 治理版本：2
+> 事实状态：n/a
+> 生命周期：historical
+> 实施状态：n/a
+> SSOT 同步：synced
+> 对应事实源：docs/01-architecture/project-architecture.md
+> 替代关系：缺陷处置状态见当前架构的已知缺口
+> 最后复核时间：2026-08-06
+> 归档原因：专项评审已结束，已修复发现不再作为当前缺陷清单
+> 原始路径：docs/logs/review-surface-correctness-20260803.md
+> 归档时间：2026-08-06
+
 # Surface adapter (Steps 4-5) correctness review (2026-08-03)
 
 Read-only review of `src/surface/{threads,intake,keyed-queue,deliveries}.ts` and

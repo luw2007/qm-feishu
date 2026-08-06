@@ -130,11 +130,11 @@ QM_CONTRACT_SIGNING_SECRET=qm-feishu-contract-secret-00000001 \
 npm run test:qm-contract
 ```
 
-The compatibility envelope is recorded in `package.json` and `docs/compatibility.md`. QM HTTP routes are treated as observed external contracts, not a stable upstream SDK.
+The compatibility envelope is recorded in `package.json` and `docs/01-architecture/compatibility.md`. QM HTTP routes are treated as observed external contracts, not a stable upstream SDK.
 
 ## Release
 
-`0.1.0` is container-first; npm publication is intentionally disabled. Complete `docs/live-test-runbook.md`, obtain passing CI and Container runs, and record the immutable image digest before pushing tag `v0.1.0`. The tag-gated Release workflow rejects pending or unchecked evidence, publishes `ghcr.io/luw2007/qm-feishu:0.1.0`, and creates the GitHub release.
+`0.1.0` is container-first; npm publication is intentionally disabled. Complete `docs/03-workflows/release-verification.md`, obtain passing CI and Container runs, and record the immutable image digest before pushing tag `v0.1.0`. The tag-gated Release workflow rejects pending or unchecked evidence, publishes `ghcr.io/luw2007/qm-feishu:0.1.0`, and creates the GitHub release.
 
 ## License
 
