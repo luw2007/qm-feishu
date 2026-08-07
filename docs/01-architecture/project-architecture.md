@@ -84,7 +84,7 @@ delivery target
 
 ## Known gaps
 
-- 固定 QM revision `7f2c916` 在带 per-message idempotency key 的活跃 run follow-up 上会创建独立 run，而非 steer 原 run；删除 key 会破坏 replay safety，因此 `0.1.0` 保留此上游限制。
+- 固定 QM revision `0f0e0ad` 的自动 source-auth contract 已纳入发布门禁；真实 Feishu 活跃 run follow-up 行为仍需按 release matrix 重新验证。此前 revision `7f2c916` 在带 per-message idempotency key 时会创建独立 run，而非 steer 原 run；adapter 保留 idempotency 以保证 replay safety。
 - Rich-post 解码只保留有 `text` 字段的元素；图片、@ 等非文本元素不会进入 turn 文本。
 - 长文本按 JavaScript UTF-16 code unit 分片；边界可能切开 surrogate pair。
 - 群附件不会送达：应用只申请显式群 @ 权限，且 Feishu 附件消息不能携带 @；适配器不跨消息猜测归属。

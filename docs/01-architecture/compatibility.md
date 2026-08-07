@@ -13,7 +13,7 @@
 
 | Component | Tested version |
 |---|---|
-| QM | `yc-software/qm` revision `7f2c916` |
+| QM | `luw2007/qm` revision `0f0e0ad` |
 | Node.js | `24.18.0` |
 | `@larksuiteoapi/node-sdk` | `1.72.0` |
 | Feishu delivery mode | WebSocket long connection |

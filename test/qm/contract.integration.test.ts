@@ -4,7 +4,7 @@ import test from 'node:test';
 
 import { QmHttpClient } from '../../src/qm/client.js';
 
-const QM_REVISION = '7f2c916';
+const QM_REVISION = '0f0e0ad';
 const baseUrl = process.env.QM_CONTRACT_BASE_URL;
 const signingSecret = process.env.QM_CONTRACT_SIGNING_SECRET;
 const skipReason = baseUrl ? false : 'QM_CONTRACT_BASE_URL is unset; start the pinned local QM checkout to run this contract';

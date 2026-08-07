@@ -23,7 +23,7 @@
 - Correctness-review verdict: `PENDING`
 - Operator: `PENDING`
 
-固定环境：QM `7f2c916`、Node `24.18.0`、`@larksuiteoapi/node-sdk` `1.72.0`、Feishu WebSocket long connection。
+固定自动兼容环境：QM `luw2007/qm@0f0e0ad`、Node `24.18.0`、`@larksuiteoapi/node-sdk` `1.72.0`、Feishu WebSocket long connection。下方既有 live evidence 来自旧 pin `yc-software/qm@7f2c916`，切换后不得视为新 pin 的通过证据；发布前须重跑 live matrix。
 
 ## Preconditions
 

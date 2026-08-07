@@ -51,7 +51,7 @@
     "typescript-eslint": "8.65.0"
   },
   "qmCompatibility": {
-    "repository": "yc-software/qm",
-    "revision": "7f2c916"
+    "repository": "luw2007/qm",
+    "revision": "0f0e0ad"
   }
 }

@@ -1,6 +1,6 @@
 # qm-feishu
 
-An independently deployable Feishu/Lark message surface for [QM](https://github.com/yc-software/qm). It communicates with QM only through source-authenticated HTTP and never imports or vendors QM source.
+An independently deployable Feishu/Lark message surface for [QM](https://github.com/luw2007/qm). It communicates with QM only through source-authenticated HTTP and never imports or vendors QM source.
 
 ## Supported surface
 
