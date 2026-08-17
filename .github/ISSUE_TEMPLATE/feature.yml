@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose an outcome for qm-feishu
+title: "[Feature]: "
+labels: ["type:feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, tenant identifiers, message data, or attachment data. Security vulnerabilities must be reported privately using the Security vulnerability link below.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the user or operator problem with synthetic, non-sensitive context.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Proposed outcome
+      description: State the observable result you want, rather than an implementation mandate.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and non-goals
+      description: Identify what this request includes and explicitly excludes.
+      placeholder: |
+        Scope:
+        - ...
+
+        Non-goals:
+        - ...
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Data safety
+      options:
+        - label: I removed credentials, tenant identifiers, message data, and attachment data from this request.
+          required: true
