@@ -1,0 +1,58 @@
+name: Bug report
+description: Report reproducible qm-feishu behavior
+title: "[Bug]: "
+labels: ["type:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, tenant identifiers, message data, or attachment data. Report security vulnerabilities privately using the Security vulnerability link below.
+  - type: input
+    id: version
+    attributes:
+      label: qm-feishu version or commit
+      description: Provide a released version or full commit SHA.
+      placeholder: v0.1.0 or full commit SHA
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Give the smallest synthetic, sanitized sequence that demonstrates the problem. Do not include credentials, tenant identifiers, message data, or attachment data.
+      placeholder: |
+        1. Configure with synthetic values...
+        2. Trigger the behavior...
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include only sanitized observations or redacted logs; never include credentials, tenant identifiers, message data, or attachment data.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include OS, Node.js version, and deployment context using non-sensitive values only.
+      placeholder: macOS 15, Node.js 24.x, self-hosted
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Data safety
+      options:
+        - label: I removed credentials, tenant identifiers, message data, and attachment data from this report.
+          required: true
+        - label: This is not a security vulnerability; security reports use the private advisory link.
+          required: true
