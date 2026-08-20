@@ -40,7 +40,7 @@
     "test:qm-contract": "node --import tsx --test test/qm/contract.integration.test.ts"
   },
   "dependencies": {
-    "@larksuiteoapi/node-sdk": "1.72.0"
+    "@larksuiteoapi/node-sdk": "1.73.0"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
