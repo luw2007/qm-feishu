@@ -23,7 +23,7 @@
 - Correctness-review verdict: `PENDING`
 - Operator: `PENDING`
 
-固定环境：QM `7f2c916`、Node `24.18.0`、`@larksuiteoapi/node-sdk` `1.72.0`、Feishu WebSocket long connection。
+固定环境：QM `0e3f9b9`、Node `24.18.0`、`@larksuiteoapi/node-sdk` `1.73.0`、Feishu WebSocket long connection。
 
 ## Preconditions
 
@@ -45,7 +45,7 @@
 | Unmentioned group message | No turn or acknowledgement | `2026-08-04T13:53:07Z / N/A` | PASS |
 | Topic follow-up | Reply remains at topic root | `2026-08-06 / N/A` | WAIVED FOR 0.1.0 |
 | Stop during active run | Abort active run; no second run | `2026-08-05T14:49:03Z / 3ccbdd` | PASS |
-| Ordinary active-run follow-up | Preserve deterministic replay safety | `2026-08-06 / 8e6eac, 84bbf8` | ACCEPTED QM LIMITATION |
+| Ordinary active-run follow-up | Preserve deterministic replay safety | Latest QM `0e3f9b9` contract automation passed; live Feishu evidence pending | PENDING LIVE RECHECK |
 | Incoming image in bot DM | Stage bounded blob with metadata | `2026-08-05T13:33:23Z / 13f1af` | PASS |
 | Incoming generic file in bot DM | Stage blob with filename/media metadata | `2026-08-05T08:20:41Z / 576d47` | PASS |
 | Outgoing file | Upload/send precedes delivery ack | `2026-08-06T07:53:23Z / 329390` | PASS |

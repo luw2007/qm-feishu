@@ -5,7 +5,7 @@
 > SSOT 同步：synced
 > 对应事实源：package.json, .github/workflows/ci.yml, .github/workflows/release.yml
 > 替代关系：n/a
-> 最后复核时间：2026-08-06
+> 最后复核时间：2026-09-10
 
 # Compatibility
 
@@ -13,9 +13,9 @@
 
 | Component | Tested version |
 |---|---|
-| QM | `yc-software/qm` revision `7f2c916` |
+| QM | `yc-software/qm` revision `0e3f9b9` |
 | Node.js | `24.18.0` |
-| `@larksuiteoapi/node-sdk` | `1.72.0` |
+| `@larksuiteoapi/node-sdk` | `1.73.0` |
 | Feishu delivery mode | WebSocket long connection |
 
 The adapter treats QM's source-authenticated HTTP routes as an observed external contract, not a stable upstream SDK. Compatibility CI must run against the exact QM revision above before release. A QM upgrade requires rerunning `npm run test:qm-contract` and the live matrix in `docs/03-workflows/release-verification.md` before updating this table.
